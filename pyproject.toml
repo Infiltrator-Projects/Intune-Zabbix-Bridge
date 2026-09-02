@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intune-zabbix-bridge"
+version = "0.1.0"
+description = "Read-only Microsoft Intune telemetry bridge for Zabbix"
+requires-python = ">=3.11"
+authors = [
+  { name = "Infiltrator Projects" }
+]
+license = { text = "Proprietary" }
+dependencies = []
+
+[project.scripts]
+intune-zabbix-bridge = "intune_zabbix_bridge.collector:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
