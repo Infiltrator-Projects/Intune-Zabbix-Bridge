@@ -71,6 +71,7 @@ restorecon -RF "$MODULE_ROOT/$MODULE_NAME" >/dev/null 2>&1 || true
 printf 'INTUNE — Reboot Watch %s installed.\n' "$MODULE_VERSION"
 printf 'Zabbix: Administration -> General -> Modules -> Scan directory\n'
 printf 'Enable the module and refresh the browser.\n'
+exit 0
 BODY
 
 printf '%s\n' '__INTUNE_REBOOT_WATCH_PAYLOAD__' >> "$OUTPUT_FILE"
