@@ -16,7 +16,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
       - name: Install test dependencies
-        run: sudo apt-get update && sudo apt-get install -y jq php-cli nodejs zabbix-sender
+        run: sudo apt-get update && sudo apt-get install -y jq php-cli nodejs
       - name: Run project tests
         run: ./tools/test.sh
       - name: Build release artifacts
