@@ -45,3 +45,49 @@ jobs:
             dist/*.deb
             dist/*.run
           if-no-files-found: error
+
+  release:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Download tested private installers
+        uses: actions/download-artifact@v4
+        with:
+          name: intune-zabbix-bridge-private-installers
+          path: dist
+      - name: Publish versioned private release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+          version="$(jq -r '.version' module/intune_reboot_watch/manifest.json)"
+          tag="v${version}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; nothing to publish."
+            exit 0
+          fi
+
+          notes="$(awk -v version="$version" '
+            $0 ~ "^## " version " " { capture = 1; next }
+            capture && /^## / { exit }
+            capture { print }
+          ' CHANGELOG.md)"
+
+          if [[ -z "${notes//[[:space:]]/}" ]]; then
+            notes="Private/internal release $version."
+          fi
+
+          gh release create "$tag" \
+            dist/*.deb \
+            dist/*.run \
+            --target "$GITHUB_SHA" \
+            --title "Intune Zabbix Bridge $version" \
+            --notes "$notes"
