@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 — 2026-09-02
+
+- aligned module release metadata with the private 0.6.1 package;
+- retained the confidential/private-only distribution policy.
+
 ## 0.6.0 — 2026-09-02
 
 - simplified deployment to one universal package plus one deployment-specific environment file;
