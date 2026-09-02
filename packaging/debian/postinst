@@ -12,8 +12,9 @@ if [ -f /etc/intune-zabbix-bridge/bridge.env ]; then
     chmod 0640 /etc/intune-zabbix-bridge/bridge.env
 fi
 if command -v systemctl >/dev/null 2>&1; then
-    systemctl daemon-reload >/dev/null 2>&1 || true
-    systemctl enable --now intune-zabbix-bridge-import.path >/dev/null 2>&1 || true
+    systemctl daemon-reload >/dev/null
+    systemctl enable intune-zabbix-bridge-import.path >/dev/null
+    systemctl start intune-zabbix-bridge-import.path
     if [ -s /etc/intune-zabbix-bridge/bridge.env ] &&
        grep -q '^AZURE_TENANT_ID=.' /etc/intune-zabbix-bridge/bridge.env &&
        grep -q '^AZURE_CLIENT_ID=.' /etc/intune-zabbix-bridge/bridge.env &&
