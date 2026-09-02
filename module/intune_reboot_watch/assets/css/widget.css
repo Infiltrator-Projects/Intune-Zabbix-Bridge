@@ -101,6 +101,44 @@
 .irw-stat.is-warn .irw-stat-value { color: var(--irw-amber); }
 .irw-stat.is-critical .irw-stat-value { color: var(--irw-red); }
 
+.irw-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+    padding: 8px 9px;
+    border-bottom: 1px solid var(--irw-border);
+    background: var(--irw-panel);
+}
+
+.irw-search {
+    width: min(360px, 100%);
+    min-width: 180px;
+    height: 30px;
+    padding: 5px 9px;
+    border: 1px solid var(--irw-border);
+    border-radius: 4px;
+    outline: none;
+    background: #07131f;
+    color: var(--irw-text);
+}
+
+.irw-search::placeholder {
+    color: var(--irw-muted);
+}
+
+.irw-search:focus {
+    border-color: var(--irw-cyan);
+    box-shadow: 0 0 0 2px rgba(43,214,224,.16);
+}
+
+.irw-result-count {
+    margin-left: auto;
+    color: var(--irw-muted);
+    font-size: 10px;
+    white-space: nowrap;
+}
+
 .irw-table {
     flex: 1 1 auto;
     margin: 0;
@@ -111,11 +149,62 @@
     position: sticky;
     top: 0;
     z-index: 1;
+    padding: 0;
     background: #0b1a29;
     color: var(--irw-muted);
     font-size: 10px;
     letter-spacing: .03em;
     text-transform: uppercase;
+}
+
+.irw-sort {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    min-height: 30px;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: 0;
+    outline: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: inherit;
+    text-align: left;
+    text-transform: inherit;
+    white-space: nowrap;
+}
+
+.irw-sort::after {
+    content: '↕';
+    color: rgba(127,154,172,.55);
+    font-size: 11px;
+}
+
+.irw-sort[data-sort-direction='asc']::after {
+    content: '▲';
+    color: var(--irw-cyan);
+}
+
+.irw-sort[data-sort-direction='desc']::after {
+    content: '▼';
+    color: var(--irw-cyan);
+}
+
+.irw-sort:hover,
+.irw-sort:focus-visible {
+    background: rgba(43,214,224,.08);
+    color: var(--irw-text);
+}
+
+.irw-filter-empty td {
+    padding: 18px 10px;
+    color: var(--irw-muted);
+    text-align: center;
 }
 
 .irw-table td {

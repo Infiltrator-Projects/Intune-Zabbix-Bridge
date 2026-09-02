@@ -29,9 +29,9 @@ INTUNE — Reboot Watch
 
 ## Responsibilities
 
-The Python collector authenticates to Graph, reads reboot telemetry, keeps the newest record per device, excludes stale endpoint telemetry from the live ranking and sends fleet items to Zabbix.
+The Python collector authenticates to Graph, reads reboot telemetry, keeps the newest record per device, excludes stale endpoint telemetry from the live ranking and sends fleet items to Zabbix. The summary contains the complete fresh-device list plus the legacy bounded `top` list.
 
-`FleetSummary.php` parses/normalises summary JSON without Zabbix dependencies. `TelemetryState.php` classifies collector freshness. `WidgetForm.php` persists only source item, row count and stale threshold. `WidgetView.php` is the only frontend component that calls Zabbix APIs. Browser JavaScript owns no network transport or competing refresh timer.
+`FleetSummary.php` parses/normalises summary JSON without Zabbix dependencies. `TelemetryState.php` classifies collector freshness. `WidgetForm.php` persists only source item, row count and stale threshold. `WidgetView.php` is the only frontend component that calls Zabbix APIs. Browser JavaScript performs case-insensitive computer/user filtering and column sorting over the supplied fresh-device list. It owns no network transport or competing refresh timer.
 
 ## Source-item resolution
 

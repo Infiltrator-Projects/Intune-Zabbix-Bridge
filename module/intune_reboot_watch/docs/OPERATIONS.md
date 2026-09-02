@@ -12,6 +12,8 @@ The ranking includes only endpoint telemetry the collector considers fresh.
 
 **Computer** is the Intune managed-device name. **Uptime** comes from Windows `LastBootUpTime`. **Last restart** is the actual Windows boot time. **Telemetry collected** is when that endpoint record was captured. **Age** is endpoint telemetry age at collector generation.
 
+Search matches computer names and usernames without case sensitivity. Click any column heading to sort the complete fresh-device list; click the active heading again to reverse direction. Uptime descending remains the initial view, and the configured row count limits only how many matches are visible rather than what can be searched.
+
 ## Fault isolation
 
 If the summary item is missing, confirm the template is linked and `intune.windows.summary.json` exists in Latest data.

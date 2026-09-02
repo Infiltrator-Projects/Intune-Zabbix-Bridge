@@ -1,4 +1,6 @@
+import json
 import unittest
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from intune_zabbix_bridge.collector import (
@@ -59,6 +61,14 @@ class CollectorTests(unittest.TestCase):
         lines = metrics["intune.windows.top10"].splitlines()
         self.assertIn("OLDER", lines[2])
         self.assertIn("NEWER", lines[3])
+
+        limited_metrics = build_metrics(
+            records, config=replace(config, top_n=1), now=now
+        )
+        summary = json.loads(limited_metrics["intune.windows.summary.json"])
+        self.assertEqual(len(summary["devices"]), 2)
+        self.assertEqual(len(summary["top"]), 1)
+        self.assertEqual(summary["devices"][0]["computer_name"], "OLDER")
 
 
 if __name__ == "__main__":

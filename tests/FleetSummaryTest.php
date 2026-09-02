@@ -44,4 +44,26 @@ if ($summary['reporting_devices'] !== 3 || $summary['stale_devices'] !== 1) {
     fail_fleet('Counters were not preserved.');
 }
 
+$full_summary = $parser->parse(json_encode([
+    'generated_at' => '2026-09-02T03:00:00+00:00',
+    'devices' => [
+        ['computer_name' => 'PC-3', 'user' => 'c@example.com', 'uptime_days' => 3],
+        ['computer_name' => 'PC-1', 'user' => 'a@example.com', 'uptime_days' => 1],
+        ['computer_name' => 'PC-2', 'user' => 'b@example.com', 'uptime_days' => 2]
+    ],
+    'top' => [
+        ['computer_name' => 'PC-3', 'user' => 'c@example.com', 'uptime_days' => 3]
+    ]
+], JSON_THROW_ON_ERROR), 2);
+
+if (count($full_summary['devices']) !== 3) {
+    fail_fleet('Full searchable device list was truncated.');
+}
+if (count($full_summary['top']) !== 2) {
+    fail_fleet('Visible top list did not honour the row limit.');
+}
+if ($full_summary['devices'][0]['computer_name'] !== 'PC-3') {
+    fail_fleet('Full device list was not ranked by uptime.');
+}
+
 fwrite(STDOUT, "FleetSummary tests passed.\n");

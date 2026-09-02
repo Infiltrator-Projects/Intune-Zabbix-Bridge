@@ -84,7 +84,7 @@ final class WidgetView extends CControllerDashboardWidgetView {
                         (string) $history[0]['value'],
                         $this->rowLimit()
                     );
-                    $rows = $this->prepareRows($summary['top']);
+                    $rows = $this->prepareRows($summary['devices']);
                     $state = (new TelemetryState())->evaluate(
                         (string) $summary['generated_at'],
                         new DateTimeImmutable('now', new DateTimeZone('UTC')),
@@ -107,6 +107,7 @@ final class WidgetView extends CControllerDashboardWidgetView {
             'item_name' => (string) ($item['name'] ?? ''),
             'summary' => $summary,
             'rows' => $rows,
+            'row_limit' => $this->rowLimit(),
             'collector_state' => $state,
             'received_at' => $received_at,
             'stale_minutes' => $this->staleMinutes(),
@@ -336,16 +337,18 @@ final class WidgetView extends CControllerDashboardWidgetView {
 
         foreach ($rows as $index => $row) {
             $uptime = max(0.0, (float) ($row['uptime_days'] ?? 0));
+            $last_restart = (string) ($row['last_restart'] ?? '');
+            $telemetry_collected = (string) ($row['telemetry_collected'] ?? '');
 
             $result[] = [
                 'rank' => $index + 1,
                 'computer_name' => (string) ($row['computer_name'] ?? ''),
                 'user' => (string) ($row['user'] ?? ''),
                 'uptime_days' => $uptime,
-                'last_restart' => $this->formatIsoTime((string) ($row['last_restart'] ?? '')),
-                'telemetry_collected' => $this->formatIsoTime(
-                    (string) ($row['telemetry_collected'] ?? '')
-                ),
+                'last_restart' => $this->formatIsoTime($last_restart),
+                'last_restart_sort' => $this->isoTimestamp($last_restart),
+                'telemetry_collected' => $this->formatIsoTime($telemetry_collected),
+                'telemetry_collected_sort' => $this->isoTimestamp($telemetry_collected),
                 'telemetry_age_hours' => max(
                     0.0,
                     (float) ($row['telemetry_age_hours'] ?? 0)
@@ -371,6 +374,19 @@ final class WidgetView extends CControllerDashboardWidgetView {
         }
         catch (Throwable) {
             return $value;
+        }
+    }
+
+    private function isoTimestamp(string $value): int {
+        if (trim($value) === '') {
+            return 0;
+        }
+
+        try {
+            return (new DateTimeImmutable($value))->getTimestamp();
+        }
+        catch (Throwable) {
+            return 0;
         }
     }
 

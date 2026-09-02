@@ -1,6 +1,6 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.6.1  
+**Release:** 0.7.0  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** private/internal only
 
@@ -18,3 +18,6 @@ INTUNE_TELEMETRY_SCRIPT_ID=
 Put that one file in the logged-in Linux user's **Downloads** folder. A systemd path watcher imports it automatically to `/etc/intune-zabbix-bridge/bridge.env`, removes the Downloads copy, enables the collector timer and immediately performs the first collection.
 
 The Zabbix widget self-provisions its host group, fleet host and trapper items.
+
+The fleet table searches all fresh devices by computer name or username. Every
+column heading is clickable; click the active heading again to reverse its sort.

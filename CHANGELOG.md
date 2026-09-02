@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0 — 2026-09-02
+
+- added case-insensitive computer-name and username search across fresh fleet telemetry;
+- made every fleet-table column sortable in both directions;
+- retained search and sort state across normal Zabbix widget refreshes;
+- preserved the legacy top-list payload while adding the full fresh-device list.
+
 ## 0.6.1 — 2026-09-02
 
 - aligned release metadata after the private-distribution hardening update;

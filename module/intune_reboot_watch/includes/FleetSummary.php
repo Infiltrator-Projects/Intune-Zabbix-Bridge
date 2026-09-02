@@ -20,9 +20,37 @@ final class FleetSummary {
         }
 
         $row_limit = max(1, min(10, $row_limit));
+        $source_rows = array_key_exists('devices', $decoded) && is_array($decoded['devices'])
+            ? $decoded['devices']
+            : (array) ($decoded['top'] ?? []);
+        $rows = $this->normaliseRows($source_rows);
+
+        return [
+            'generated_at' => trim((string) ($decoded['generated_at'] ?? '')),
+            'reporting_devices' => self::nonNegativeInt($decoded['reporting_devices'] ?? 0),
+            'fresh_devices' => self::nonNegativeInt($decoded['fresh_devices'] ?? 0),
+            'stale_devices' => self::nonNegativeInt($decoded['stale_devices'] ?? 0),
+            'max_telemetry_age_hours' => self::nonNegativeFloat(
+                $decoded['max_telemetry_age_hours'] ?? 0
+            ),
+            'max_uptime_days' => self::nonNegativeFloat($decoded['max_uptime_days'] ?? 0),
+            'over_7_days' => self::nonNegativeInt($decoded['over_7_days'] ?? 0),
+            'over_14_days' => self::nonNegativeInt($decoded['over_14_days'] ?? 0),
+            'over_30_days' => self::nonNegativeInt($decoded['over_30_days'] ?? 0),
+            'devices' => $rows,
+            'top' => array_slice($rows, 0, $row_limit)
+        ];
+    }
+
+    /**
+     * @param array<int, mixed> $candidates
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function normaliseRows(array $candidates): array {
         $rows = [];
 
-        foreach ((array) ($decoded['top'] ?? []) as $candidate) {
+        foreach ($candidates as $candidate) {
             if (!is_array($candidate)) {
                 continue;
             }
@@ -38,7 +66,9 @@ final class FleetSummary {
                 'last_restart' => trim((string) ($candidate['last_restart'] ?? '')),
                 'telemetry_collected' => trim((string) ($candidate['telemetry_collected'] ?? '')),
                 'uptime_days' => self::nonNegativeFloat($candidate['uptime_days'] ?? 0),
-                'telemetry_age_hours' => self::nonNegativeFloat($candidate['telemetry_age_hours'] ?? 0),
+                'telemetry_age_hours' => self::nonNegativeFloat(
+                    $candidate['telemetry_age_hours'] ?? 0
+                ),
                 'fresh' => (bool) ($candidate['fresh'] ?? false)
             ];
         }
@@ -49,20 +79,7 @@ final class FleetSummary {
                 $right['uptime_days'] <=> $left['uptime_days']
         );
 
-        return [
-            'generated_at' => trim((string) ($decoded['generated_at'] ?? '')),
-            'reporting_devices' => self::nonNegativeInt($decoded['reporting_devices'] ?? 0),
-            'fresh_devices' => self::nonNegativeInt($decoded['fresh_devices'] ?? 0),
-            'stale_devices' => self::nonNegativeInt($decoded['stale_devices'] ?? 0),
-            'max_telemetry_age_hours' => self::nonNegativeFloat(
-                $decoded['max_telemetry_age_hours'] ?? 0
-            ),
-            'max_uptime_days' => self::nonNegativeFloat($decoded['max_uptime_days'] ?? 0),
-            'over_7_days' => self::nonNegativeInt($decoded['over_7_days'] ?? 0),
-            'over_14_days' => self::nonNegativeInt($decoded['over_14_days'] ?? 0),
-            'over_30_days' => self::nonNegativeInt($decoded['over_30_days'] ?? 0),
-            'top' => array_slice($rows, 0, $row_limit)
-        ];
+        return $rows;
     }
 
     private static function nonNegativeInt(mixed $value): int {

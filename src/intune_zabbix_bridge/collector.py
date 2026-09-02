@@ -309,6 +309,12 @@ def build_metrics(
     )
     max_uptime = max((record.uptime_days for record in fresh), default=0.0)
 
+    ranked_devices = sorted(
+        fresh, key=lambda record: record.uptime_days, reverse=True
+    )
+    serialised_devices = [
+        record.as_json(local_tz) for record in ranked_devices
+    ]
     summary = {
         "generated_at": now.astimezone(local_tz).isoformat(),
         "reporting_devices": len(records),
@@ -319,12 +325,8 @@ def build_metrics(
         "over_7_days": sum(record.uptime_days >= 7 for record in fresh),
         "over_14_days": sum(record.uptime_days >= 14 for record in fresh),
         "over_30_days": sum(record.uptime_days >= 30 for record in fresh),
-        "top": [
-            record.as_json(local_tz)
-            for record in sorted(
-                fresh, key=lambda record: record.uptime_days, reverse=True
-            )[: config.top_n]
-        ],
+        "devices": serialised_devices,
+        "top": serialised_devices[: config.top_n],
     }
 
     return {
