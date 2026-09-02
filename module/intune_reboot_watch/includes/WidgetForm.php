@@ -1,9 +1,5 @@
 <?php declare(strict_types = 1);
 
-/**
- * Persistent dashboard configuration for INTUNE — Reboot Watch.
- */
-
 namespace Modules\IntuneRebootWatch\Includes;
 
 use Zabbix\Widgets\CWidgetForm;
@@ -20,11 +16,6 @@ final class WidgetForm extends CWidgetForm {
     public const MAXIMUM_STALE_MINUTES = 1440;
     public const DEFAULT_STALE_MINUTES = 30;
 
-    /**
-     * Only stable operator choices are persisted. Current telemetry, collector
-     * health and ranking state remain data concerns and are never dashboard
-     * configuration.
-     */
     public function addFields(): self {
         return $this
             ->addField(

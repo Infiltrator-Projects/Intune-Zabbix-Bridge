@@ -21,11 +21,7 @@
     "refresh_rate": 60
   },
   "assets": {
-    "css": [
-      "widget.css"
-    ],
-    "js": [
-      "class.widget.js"
-    ]
+    "css": ["widget.css"],
+    "js": ["class.widget.js"]
   }
 }

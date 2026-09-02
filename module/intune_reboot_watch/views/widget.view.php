@@ -1,11 +1,7 @@
 <?php declare(strict_types = 1);
 
-/**
- * INTUNE — Reboot Watch presentation.
- *
- * @var CView $this
- * @var array<string, mixed> $data
- */
+/** @var CView $this */
+/** @var array<string, mixed> $data */
 
 if ($data['error'] !== null) {
     (new CWidgetView($data))
@@ -111,21 +107,12 @@ if ($data['rows'] === []) {
 }
 
 $footer = (new CDiv([
-    (new CSpan(
-        _('Collector threshold: ').(string) $data['stale_minutes'].' min'
-    )),
-    (new CSpan(
-        _('Zabbix received: ').(string) $data['received_at']
-    ))
+    (new CSpan(_('Collector threshold: ').(string) $data['stale_minutes'].' min')),
+    (new CSpan(_('Zabbix received: ').(string) $data['received_at']))
 ]))->addClass('irw-footer');
 
-$body = (new CDiv([
-    $health,
-    $stats,
-    $table,
-    $footer
-]))->addClass('irw');
-
 (new CWidgetView($data))
-    ->addItem($body)
+    ->addItem(
+        (new CDiv([$health, $stats, $table, $footer]))->addClass('irw')
+    )
     ->show();

@@ -1,13 +1,5 @@
 <?php declare(strict_types = 1);
 
-/**
- * INTUNE — Reboot Watch dashboard controller.
- *
- * This is the only module component that talks to the Zabbix runtime API.
- * Summary parsing and freshness rules live in dependency-light helper classes
- * so their behaviour can be regression tested outside the frontend.
- */
-
 namespace Modules\IntuneRebootWatch\Actions;
 
 use API;
@@ -22,10 +14,7 @@ use Throwable;
 
 final class WidgetView extends CControllerDashboardWidgetView {
 
-    /** Canonical trapper item written by the collector. */
     private const SUMMARY_KEY = 'intune.windows.summary.json';
-
-    /** Prefer the conventional fleet host when automatic discovery has choices. */
     private const PREFERRED_HOST_NAME = 'Microsoft Intune - Windows Fleet';
 
     protected function doAction(): void {
@@ -98,17 +87,6 @@ final class WidgetView extends CControllerDashboardWidgetView {
         ]));
     }
 
-    /**
-     * Resolve the source item deterministically:
-     * 1. explicitly configured accessible text item;
-     * 2. canonical key on the conventional fleet host;
-     * 3. first accessible canonical-key text item.
-     *
-     * All reads use Zabbix APIs and therefore remain subject to the authenticated
-     * frontend user's permissions.
-     *
-     * @return array<string, mixed>|null
-     */
     private function findSummaryItem(): ?array {
         $configured = $this->normaliseItemIds($this->fields_values['itemid'] ?? []);
 
@@ -158,10 +136,6 @@ final class WidgetView extends CControllerDashboardWidgetView {
         return $eligible[0] ?? null;
     }
 
-    /**
-     * @param list<array<string, mixed>> $rows
-     * @return list<array<string, mixed>>
-     */
     private function prepareRows(array $rows): array {
         $result = [];
 
@@ -205,12 +179,6 @@ final class WidgetView extends CControllerDashboardWidgetView {
         }
     }
 
-    /**
-     * Multi-select values are considered untrusted saved state even though the
-     * native form normally supplies scalar item IDs.
-     *
-     * @return list<string>
-     */
     private function normaliseItemIds(mixed $value): array {
         $values = is_array($value) ? $value : [$value];
         $ids = [];

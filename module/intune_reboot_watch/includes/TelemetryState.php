@@ -1,9 +1,5 @@
 <?php declare(strict_types = 1);
 
-/**
- * Collector freshness classification.
- */
-
 namespace Modules\IntuneRebootWatch\Includes;
 
 use DateTimeImmutable;
@@ -12,9 +8,6 @@ use Throwable;
 
 final class TelemetryState {
 
-    /**
-     * @return array{status:string,age_minutes:?float,label:string}
-     */
     public function evaluate(
         string $generated_at,
         DateTimeImmutable $now,
@@ -43,8 +36,10 @@ final class TelemetryState {
             ];
         }
 
-        $age_seconds = max(0, $now_utc->getTimestamp() - $generated->getTimestamp());
-        $age_minutes = $age_seconds / 60;
+        $age_minutes = max(
+            0,
+            $now_utc->getTimestamp() - $generated->getTimestamp()
+        ) / 60;
 
         if ($age_minutes > $stale_minutes) {
             return [
