@@ -1,6 +1,6 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.3.0  
+**Release:** 0.5.0  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Delivery:** Infiltrator APT / Linux Mint Software Manager
 
@@ -37,10 +37,9 @@ Then in Zabbix:
 1. **Administration → General → Modules → Scan directory**.
 2. Enable **INTUNE — Reboot Watch**.
 3. Refresh the browser.
-4. Import `/usr/share/intune-zabbix-bridge/zabbix/template_intune_zabbix_bridge.yaml` if the bridge template is not already present.
-5. Link it to a host named **Microsoft Intune - Windows Fleet**.
+4. Add **INTUNE — Reboot Watch** to the dashboard. The widget self-provisions its Zabbix host and trapper items when needed.
 
-Configure the collector in `/etc/intune-zabbix-bridge/bridge.env` before enabling its timer.
+Open **Intune Zabbix Bridge Setup** from the Linux Mint application menu, paste the Entra Tenant ID, Client ID and Client secret, then click **Save & Start Collector**. The utility handles the protected configuration file and systemd timer automatically; no terminal or manual `/etc` editing is required.
 
 ## Documentation
 
