@@ -4,9 +4,9 @@
   "type": "widget",
   "name": "INTUNE — Reboot Watch",
   "namespace": "IntuneRebootWatch",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "Infiltrator Projects",
-  "description": "Top Windows uptime and reboot telemetry from Microsoft Intune.",
+  "description": "Zabbix 7.0 dashboard widget for Microsoft Intune reboot telemetry, fleet freshness and longest-running Windows devices.",
   "actions": {
     "widget.intune_reboot_watch.view": {
       "class": "WidgetView"
@@ -15,7 +15,7 @@
   "widget": {
     "size": {
       "width": 72,
-      "height": 10
+      "height": 12
     },
     "js_class": "WidgetIntuneRebootWatch",
     "refresh_rate": 60
