@@ -62,13 +62,21 @@ def main() -> int:
     if source is None:
         print("No intune-zabbix-bridge.env file is waiting in Downloads.")
         return 0
+    source_stat = source.stat()
+    error_file = source.parent / "intune-zabbix-bridge.ERROR.txt"
     try:
         values = parse_file(source)
         write_canonical(values)
     except Exception as exc:
+        invalid = source.parent / "intune-zabbix-bridge.INVALID.env"
+        source.replace(invalid)
+        error_file.write_text(f"Configuration import failed: {exc}\n", encoding="utf-8")
+        os.chown(invalid, source_stat.st_uid, source_stat.st_gid)
+        os.chown(error_file, source_stat.st_uid, source_stat.st_gid)
         print(f"Configuration import failed: {exc}", file=sys.stderr)
         return 1
     source.unlink(missing_ok=True)
+    error_file.unlink(missing_ok=True)
     run("systemctl", "daemon-reload")
     timer = run("systemctl", "enable", "--now", "intune-zabbix-bridge.timer")
     if timer.returncode != 0:
@@ -76,7 +84,11 @@ def main() -> int:
         return timer.returncode
     first = run("systemctl", "restart", "intune-zabbix-bridge.service")
     if first.returncode != 0:
-        print("Configuration imported, but the first collector run failed. See journalctl -u intune-zabbix-bridge.service", file=sys.stderr)
+        logs = run("journalctl", "-u", "intune-zabbix-bridge.service", "-n", "60", "--no-pager")
+        message = "Configuration imported, but the first collector run failed.\n\n" + logs.stdout
+        error_file.write_text(message, encoding="utf-8")
+        os.chown(error_file, source_stat.st_uid, source_stat.st_gid)
+        print(message, file=sys.stderr)
         return first.returncode
     print("Configuration imported and first collection completed successfully.")
     return 0
