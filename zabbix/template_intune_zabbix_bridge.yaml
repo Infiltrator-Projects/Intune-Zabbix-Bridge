@@ -1,0 +1,95 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 5f0a22ef16634d0a8d45e68482a87101
+      name: Templates/Custom
+  templates:
+    - uuid: 821e3ec0c9df4f65bc20221b1c599102
+      template: 'Intune Zabbix Bridge'
+      name: 'Intune Zabbix Bridge'
+      description: 'Read-only Microsoft Intune fleet telemetry delivered by Intune-Zabbix-Bridge.'
+      groups:
+        - name: Templates/Custom
+      items:
+        - uuid: 6ed9aa359fb445eeab2df26a53594703
+          name: 'Intune: Windows reporting devices'
+          type: TRAP
+          key: intune.windows.reporting.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: a38fd6d0ff314cd9bb623b5f3add4504
+          name: 'Intune: Windows fresh telemetry devices'
+          type: TRAP
+          key: intune.windows.fresh.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: 4b933cf8add24877a9d6133a2d25b705
+          name: 'Intune: Windows stale telemetry devices'
+          type: TRAP
+          key: intune.windows.stale.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: 43fc6ee601814746a6b1d4053b1d8406
+          name: 'Intune: Maximum Windows uptime'
+          type: TRAP
+          key: intune.windows.max.uptime.days
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: FLOAT
+          units: d
+        - uuid: 9a1a59eec2014e628d6162d5a6aa2f07
+          name: 'Intune: Windows uptime >= 7 days'
+          type: TRAP
+          key: intune.windows.uptime.over7.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: 2fe7b867ea25476aba67e7f090617708
+          name: 'Intune: Windows uptime >= 14 days'
+          type: TRAP
+          key: intune.windows.uptime.over14.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: 4677963861fa461abf43b1c43bed6609
+          name: 'Intune: Windows uptime >= 30 days'
+          type: TRAP
+          key: intune.windows.uptime.over30.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: aea66ff6b9984070a5962a428871880a
+          name: 'Intune: Last telemetry collection'
+          type: TRAP
+          key: intune.windows.last.collection.epoch
+          delay: '0'
+          history: 90d
+          trends: '0'
+          units: unixtime
+          value_type: UNSIGNED
+        - uuid: e10575b97291453998e460373476a90b
+          name: 'Intune: Top 10 longest uptime'
+          type: TRAP
+          key: intune.windows.top10
+          delay: '0'
+          history: 30d
+          trends: '0'
+          value_type: TEXT
+        - uuid: 03b70b05652b45839915136282849b0c
+          name: 'Intune: Windows fleet summary JSON'
+          type: TRAP
+          key: intune.windows.summary.json
+          delay: '0'
+          history: 30d
+          trends: '0'
+          value_type: TEXT
