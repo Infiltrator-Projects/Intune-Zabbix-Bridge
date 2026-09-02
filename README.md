@@ -15,6 +15,22 @@ The first integration is **Windows reboot telemetry**: Intune already knows each
 - Last telemetry collection timestamp
 - JSON fleet summary for future dependent items / automation
 
+## Debian package
+
+A native Debian package is built by GitHub Actions:
+
+`intune-zabbix-bridge_0.1.0_all.deb`
+
+It installs the collector, systemd service/timer, Zabbix template and persistent configuration under standard Debian paths. The package does not start collection until credentials are configured.
+
+Build locally with:
+
+```bash
+./scripts/build-deb.sh
+```
+
+The output is written to `dist/`.
+
 ## Safety
 
 The bridge never contacts, wakes, reboots or remediates laptops. Microsoft Graph access is read-only. A laptop can be at school, at home or on another network; if it has reported into Intune, Zabbix can use the result.
