@@ -1,34 +1,29 @@
 #!/bin/sh
 set -e
-
-if ! getent group intune-zabbix >/dev/null 2>&1; then
-    addgroup --system intune-zabbix >/dev/null
-fi
-
+if ! getent group intune-zabbix >/dev/null 2>&1; then addgroup --system intune-zabbix >/dev/null; fi
 if ! getent passwd intune-zabbix >/dev/null 2>&1; then
-    adduser --system \
-        --ingroup intune-zabbix \
-        --home /nonexistent \
-        --no-create-home \
-        --shell /usr/sbin/nologin \
-        intune-zabbix >/dev/null
+    adduser --system --ingroup intune-zabbix --home /nonexistent --no-create-home --shell /usr/sbin/nologin intune-zabbix >/dev/null
 fi
-
+mkdir -p /etc/intune-zabbix-bridge
+chown root:intune-zabbix /etc/intune-zabbix-bridge
+chmod 0750 /etc/intune-zabbix-bridge
 if [ -f /etc/intune-zabbix-bridge/bridge.env ]; then
     chown root:intune-zabbix /etc/intune-zabbix-bridge/bridge.env
     chmod 0640 /etc/intune-zabbix-bridge/bridge.env
 fi
-
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl enable --now intune-zabbix-bridge-import.path >/dev/null 2>&1 || true
+    if [ -s /etc/intune-zabbix-bridge/bridge.env ] &&
+       grep -q '^AZURE_TENANT_ID=.' /etc/intune-zabbix-bridge/bridge.env &&
+       grep -q '^AZURE_CLIENT_ID=.' /etc/intune-zabbix-bridge/bridge.env &&
+       grep -q '^AZURE_CLIENT_SECRET=.' /etc/intune-zabbix-bridge/bridge.env &&
+       grep -q '^INTUNE_TELEMETRY_SCRIPT_ID=.' /etc/intune-zabbix-bridge/bridge.env; then
+        systemctl enable --now intune-zabbix-bridge.timer >/dev/null 2>&1 || true
+        systemctl restart intune-zabbix-bridge.service >/dev/null 2>&1 || true
+    fi
 fi
-
 printf "\nIntune-Zabbix-Bridge installed.\n"
-printf "Zabbix widget: INTUNE — Reboot Watch\n"
-printf "Open Zabbix: Administration -> General -> Modules -> Scan directory\n"
-printf "Enable the widget module and refresh the browser.\n"
-printf "Graphical setup: Menu -> Intune Zabbix Bridge Setup\n"
-printf "Enter Tenant ID, Client ID and Client secret, then click Save & Start Collector.\n"
-printf "The setup utility writes /etc/intune-zabbix-bridge/bridge.env and starts the timer for you.\n"
-
+printf "Put ONE file named intune-zabbix-bridge.env in Downloads.\n"
+printf "It will be imported automatically and the collector will run.\n"
 exit 0

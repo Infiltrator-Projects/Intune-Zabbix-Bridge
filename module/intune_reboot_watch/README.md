@@ -1,33 +1,8 @@
 # INTUNE — Reboot Watch
 
-**Release:** 0.5.0  
-**Platform:** Zabbix 7.0 LTS  
-**Type:** Zabbix dashboard widget/module  
-**Project:** Intune-Zabbix-Bridge
+**Release:** 0.6.0  
+**Platform:** Zabbix 7.0 LTS
 
-INTUNE — Reboot Watch is the Zabbix-native frontend for the bridge's Microsoft Intune reboot telemetry.
+The widget self-provisions its Zabbix host group, fleet host and trapper items.
 
-It displays the ten longest-running currently fresh Windows devices, actual last restart time, current user, telemetry collection time and age, reporting/fresh/stale counts, maximum uptime, 7/14/30-day counts and collector freshness.
-
-## Automatic Zabbix bootstrap
-
-With automatic source selection, the widget now provisions its own Zabbix-side data model on first use through the authenticated Zabbix API:
-
-- host group `Microsoft Intune`;
-- host `Microsoft Intune - Windows Fleet`;
-- all ten trapper items expected by the collector.
-
-This is idempotent and permission-aware. It does not write directly to the Zabbix database. An administrator no longer needs to import/link the supplied template for the normal installation path.
-
-## Configuration
-
-The native Zabbix editor exposes only persistent choices:
-
-- optional explicit fleet summary item;
-- rows displayed (1–10);
-- collector stale threshold (5–1440 minutes).
-
-
-## Linux Mint graphical setup
-
-The Debian package also installs **Intune Zabbix Bridge Setup** in the Mint application menu. It accepts Tenant ID, Client/Application ID and Client secret, then uses PolicyKit to save the protected collector configuration and start the service/timer without terminal commands.
+Collector deployment is one universal Debian package plus one separate `intune-zabbix-bridge.env` file. Put that file in the Linux user's Downloads folder; the package imports it and runs the collector automatically.

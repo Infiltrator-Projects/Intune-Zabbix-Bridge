@@ -4,10 +4,10 @@ Section: admin
 Priority: optional
 Architecture: all
 Maintainer: Infiltrator Projects
-Depends: python3 (>= 3.11), python3-gi, gir1.2-gtk-3.0, policykit-1, zabbix-sender, ca-certificates, zabbix-frontend-php (>= 7.0)
+Depends: python3 (>= 3.11), zabbix-sender, ca-certificates, zabbix-frontend-php (>= 7.0)
 Homepage: https://github.com/Infiltrator-Projects/Intune-Zabbix-Bridge
 Description: Microsoft Intune telemetry bridge and Zabbix reboot-watch widget
  Reads existing Microsoft Intune Windows reboot telemetry through Microsoft Graph
  and publishes fleet metrics to Zabbix. Includes the native INTUNE Reboot Watch
- dashboard widget and a graphical Mint configuration utility. The bridge does
- not contact or control managed endpoints.
+ dashboard widget. The Debian package is universal; deployment credentials are
+ supplied in one separate intune-zabbix-bridge.env file.

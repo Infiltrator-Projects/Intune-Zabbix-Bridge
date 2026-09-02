@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch Downloads for Intune Zabbix Bridge configuration
+
+[Path]
+PathExistsGlob=/home/*/Downloads/intune-zabbix-bridge.env
+PathExistsGlob=/root/Downloads/intune-zabbix-bridge.env
+Unit=intune-zabbix-bridge-import.service
+
+[Install]
+WantedBy=multi-user.target

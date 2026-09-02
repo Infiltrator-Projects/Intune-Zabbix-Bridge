@@ -1,0 +1,6 @@
+[Unit]
+Description=Import Intune Zabbix Bridge configuration
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/intune-zabbix-bridge/import-config

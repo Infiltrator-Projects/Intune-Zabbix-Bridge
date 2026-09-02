@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -19,7 +19,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y jq php-cli nodejs
       - name: Run project tests
         run: ./tools/test.sh
-      - name: Build release artifacts
+      - name: Build private artifacts
         run: |
           ./tools/build-installer.sh
           ./tools/build-deb.sh
@@ -28,61 +28,20 @@ jobs:
         run: |
           set -Eeuo pipefail
           version="$(jq -r '.version' module/intune_reboot_watch/manifest.json)"
-          run_file="dist/intune-zabbix-reboot-watch-${version}.run"
           deb="dist/intune-zabbix-bridge_${version}_all.deb"
-          test -x "$run_file"
           test "$(dpkg-deb --field "$deb" Version)" = "$version"
-          test "$(dpkg-deb --field "$deb" Package)" = "intune-zabbix-bridge"
-          test -s module/intune_reboot_watch/includes/WidgetForm.php
-      - name: Smoke-test portable widget installer
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          version="$(jq -r '.version' module/intune_reboot_watch/manifest.json)"
-          module_root="$(mktemp -d)"
-          trap 'sudo rm -rf "$module_root"' EXIT
-          sudo env ZABBIX_MODULE_ROOT="$module_root" "./dist/intune-zabbix-reboot-watch-${version}.run"
-          test "$(sudo jq -r '.version' "$module_root/intune_reboot_watch/manifest.json")" = "$version"
-      - name: Upload artifacts
+          test "$(dpkg-deb --field "$deb" Package)" = intune-zabbix-bridge
+          extract="$(mktemp -d)"
+          dpkg-deb -x "$deb" "$extract"
+          test -x "$extract/usr/lib/intune-zabbix-bridge/import-config"
+          test -f "$extract/usr/lib/systemd/system/intune-zabbix-bridge-import.path"
+          test ! -e "$extract/etc/intune-zabbix-bridge/bridge.env"
+          test -f "$extract/usr/share/doc/intune-zabbix-bridge/intune-zabbix-bridge.env.example"
+      - name: Upload private build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: intune-zabbix-bridge-installers
+          name: intune-zabbix-bridge-private-installers
           path: |
             dist/*.deb
             dist/*.run
           if-no-files-found: error
-      - name: Publish GitHub release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release ')
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -Eeuo pipefail
-          version="$(jq -r '.version' module/intune_reboot_watch/manifest.json)"
-          tag="v${version}"
-          run_file="dist/intune-zabbix-reboot-watch-${version}.run"
-          deb="dist/intune-zabbix-bridge_${version}_all.deb"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$run_file" "$deb" --clobber
-          else
-            gh release create "$tag" "$run_file" "$deb" --target "$GITHUB_SHA" --title "Intune Zabbix Bridge ${version}" --generate-notes
-          fi
-      - name: Refresh central APT repository
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release ')
-        env:
-          DISPATCH_TOKEN: ${{ secrets.APT_REPOSITORY_DISPATCH_TOKEN }}
-          RELEASE_SHA: ${{ github.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          payload="$(jq -nc --arg repository "$GITHUB_REPOSITORY" --arg sha "$RELEASE_SHA" '{event_type:"application-release",client_payload:{repository:$repository,sha:$sha}}')"
-          if [[ -n "${DISPATCH_TOKEN:-}" ]]; then
-            curl --fail-with-body --silent --show-error --request POST \
-              --header "Authorization: Bearer $DISPATCH_TOKEN" \
-              --header "Accept: application/vnd.github+json" \
-              --header "X-GitHub-Api-Version: 2022-11-28" \
-              --data "$payload" \
-              https://api.github.com/repos/Infiltrator-Projects/Infiltrator-Repository/dispatches
-          else
-            echo "::warning::APT dispatch token unavailable; repository safety refresh will publish later."
-          fi
