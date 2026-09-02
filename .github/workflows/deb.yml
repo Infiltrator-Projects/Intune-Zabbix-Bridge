@@ -23,7 +23,7 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           else
-            echo "version=0.1.0" >> "$GITHUB_OUTPUT"
+            echo "version=0.2.0" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build package
@@ -38,6 +38,9 @@ jobs:
           tmp="$(mktemp -d)"
           dpkg-deb -x dist/*.deb "$tmp"
           python3 -m py_compile             "$tmp/usr/lib/python3/dist-packages/intune_zabbix_bridge/__init__.py"             "$tmp/usr/lib/python3/dist-packages/intune_zabbix_bridge/collector.py"
+          test -s "$tmp/usr/share/zabbix/modules/intune_reboot_watch/manifest.json"
+          test -s "$tmp/usr/share/zabbix/modules/intune_reboot_watch/actions/WidgetView.php"
+          test -s "$tmp/usr/share/zabbix/modules/intune_reboot_watch/views/widget.view.php"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
