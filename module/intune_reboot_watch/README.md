@@ -1,6 +1,6 @@
 # INTUNE — Reboot Watch
 
-**Release:** 0.6.0  
+**Release:** 0.6.1  
 **Platform:** Zabbix 7.0 LTS
 
 The widget self-provisions its Zabbix host group, fleet host and trapper items.
