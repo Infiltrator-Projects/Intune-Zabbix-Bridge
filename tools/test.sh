@@ -32,7 +32,7 @@ echo "[9/12] Python syntax"
 PYTHONPATH="$ROOT/src" python3 -m compileall -q "$ROOT/src"
 echo "[10/12] Shell/Python setup syntax"
 while IFS= read -r -d '' file; do bash -n "$file"; done < <(find "$ROOT/tools" -type f -name '*.sh' -print0)
-python3 -m py_compile "$ROOT/packaging/linux/config-helper" "$ROOT/src/intune_zabbix_bridge/config_gui.py"
+python3 -m py_compile "$ROOT/packaging/linux/import-config"
 echo "[11/12] Portable installer"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -53,12 +53,11 @@ if command -v dpkg-deb >/dev/null 2>&1; then
     installed="$extract/usr/share/zabbix/modules/intune_reboot_watch/manifest.json"
     [[ -f "$installed" ]]
     [[ "$(jq -r '.version' "$installed")" == "$VERSION" ]]
-    [[ -x "$extract/usr/bin/intune-zabbix-bridge-config" ]]
-    [[ -x "$extract/usr/lib/intune-zabbix-bridge/config-helper" ]]
-    [[ -f "$extract/usr/share/applications/intune-zabbix-bridge-config.desktop" ]]
-    dpkg-deb --field "$deb" Depends | grep -Fq 'python3-gi'
-    dpkg-deb --field "$deb" Depends | grep -Fq 'gir1.2-gtk-3.0'
-    dpkg-deb --field "$deb" Depends | grep -Fq 'policykit-1'
+    [[ -x "$extract/usr/lib/intune-zabbix-bridge/import-config" ]]
+    [[ -f "$extract/usr/lib/systemd/system/intune-zabbix-bridge-import.path" ]]
+    [[ -f "$extract/usr/lib/systemd/system/intune-zabbix-bridge-import.service" ]]
+    [[ ! -e "$extract/etc/intune-zabbix-bridge/bridge.env" ]]
+    [[ -f "$extract/usr/share/doc/intune-zabbix-bridge/intune-zabbix-bridge.env.example" ]]
 fi
 if grep -R -F "$VERSION" "$ROOT/tools" "$ROOT/.github" >/dev/null; then
     echo "ERROR: current release version is hard-coded in tools or CI." >&2
