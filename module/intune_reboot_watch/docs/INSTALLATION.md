@@ -22,7 +22,7 @@ The package still ships `/usr/share/intune-zabbix-bridge/zabbix/template_intune_
 
 ## Collector configuration
 
-Configure `/etc/intune-zabbix-bridge/bridge.env` with Entra tenant ID, client ID, client secret, telemetry-script ID and Zabbix destination. Then enable/start the bridge timer.
+Open **Intune Zabbix Bridge Setup** from the Linux Mint application menu. Enter the Entra Tenant ID, Client/Application ID and Client secret, then click **Save & Start Collector**. PolicyKit requests administrator authentication, writes the protected `/etc/intune-zabbix-bridge/bridge.env`, enables the timer and runs the collector immediately. No terminal or manual system-file editing is required.
 
 ## Portable widget-only installer
 
