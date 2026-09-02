@@ -2,12 +2,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.2.0}"
 ARCH="all"
 PKG="intune-zabbix-bridge"
 BUILD_DIR="${ROOT_DIR}/build/deb/${PKG}_${VERSION}_${ARCH}"
 DIST_DIR="${ROOT_DIR}/dist"
 DEBIAN_DIR="${BUILD_DIR}/DEBIAN"
+MODULE_SOURCE="${ROOT_DIR}/module/intune_reboot_watch"
+MODULE_TARGET="${BUILD_DIR}/usr/share/zabbix/modules/intune_reboot_watch"
 
 rm -rf "${BUILD_DIR}"
 mkdir -p "${DEBIAN_DIR}"
@@ -15,6 +17,7 @@ mkdir -p "${BUILD_DIR}/usr/bin"
 mkdir -p "${BUILD_DIR}/usr/lib/python3/dist-packages/intune_zabbix_bridge"
 mkdir -p "${BUILD_DIR}/usr/lib/systemd/system"
 mkdir -p "${BUILD_DIR}/usr/share/intune-zabbix-bridge/zabbix"
+mkdir -p "${BUILD_DIR}/usr/share/zabbix/modules"
 mkdir -p "${BUILD_DIR}/usr/share/doc/${PKG}"
 mkdir -p "${BUILD_DIR}/etc/intune-zabbix-bridge"
 mkdir -p "${DIST_DIR}"
@@ -42,7 +45,8 @@ install -m 0644 "${ROOT_DIR}/zabbix/template_intune_zabbix_bridge.yaml" "${BUILD
 install -m 0644 "${ROOT_DIR}/config/bridge.env.example" "${BUILD_DIR}/etc/intune-zabbix-bridge/bridge.env"
 install -m 0644 "${ROOT_DIR}/README.md" "${BUILD_DIR}/usr/share/doc/${PKG}/README.md"
 
-# Validate syntax without shipping build-host-specific bytecode in this Architecture: all package.
+cp -a "${MODULE_SOURCE}" "${MODULE_TARGET}"
+
 python3 -m py_compile "${BUILD_DIR}/usr/lib/python3/dist-packages/intune_zabbix_bridge/__init__.py" "${BUILD_DIR}/usr/lib/python3/dist-packages/intune_zabbix_bridge/collector.py"
 find "${BUILD_DIR}" -type d -name __pycache__ -prune -exec rm -rf '{}' '+'
 
