@@ -1,119 +1,194 @@
-div.dashboard-widget-intune_reboot_watch {
-    padding: 0;
-    overflow: hidden;
-}
-
-.intune-reboot-watch {
-    --irw-panel: #0b1724;
-    --irw-panel-2: #102033;
-    --irw-line: #25384a;
-    --irw-text: #d9e5ed;
-    --irw-muted: #829bad;
-    --irw-cyan: #24d3df;
-    --irw-green: #42d48b;
-    --irw-amber: #efc45b;
-    --irw-red: #f06b76;
+.irw {
+    --irw-bg: #07111b;
+    --irw-panel: #0c1926;
+    --irw-panel-2: #102334;
+    --irw-border: #253c4f;
+    --irw-text: #dce8ef;
+    --irw-muted: #7f9aac;
+    --irw-cyan: #2bd6e0;
+    --irw-green: #49d693;
+    --irw-amber: #efc45c;
+    --irw-red: #f16d78;
 
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 260px;
-    background: #08111c;
+    min-height: 300px;
+    overflow: hidden;
+    background: var(--irw-bg);
     color: var(--irw-text);
+    font-variant-numeric: tabular-nums;
 }
 
-.intune-reboot-watch-stats {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(90px, 1fr));
+.irw-health {
+    display: flex;
+    align-items: center;
     gap: 7px;
-    padding: 10px;
-    border-bottom: 1px solid var(--irw-line);
+    flex: 0 0 auto;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--irw-border);
+    background: #091725;
+    color: var(--irw-muted);
+    font-size: 11px;
 }
 
-.intune-reboot-watch-stat {
+.irw-health-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--irw-muted);
+    box-shadow: 0 0 0 3px rgba(127, 154, 172, .12);
+}
+
+.irw-health.is-fresh .irw-health-dot {
+    background: var(--irw-green);
+    box-shadow: 0 0 8px rgba(73, 214, 147, .6);
+}
+
+.irw-health.is-stale .irw-health-dot {
+    background: var(--irw-amber);
+    box-shadow: 0 0 8px rgba(239, 196, 92, .5);
+}
+
+.irw-health-label {
+    color: var(--irw-text);
+    font-weight: 700;
+}
+
+.irw-health-source {
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.irw-stats {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(84px, 1fr));
+    gap: 6px;
+    flex: 0 0 auto;
+    padding: 9px;
+    border-bottom: 1px solid var(--irw-border);
+}
+
+.irw-stat {
     min-width: 0;
     padding: 8px 9px;
-    border: 1px solid var(--irw-line);
+    border: 1px solid var(--irw-border);
     border-radius: 5px;
-    background: var(--irw-panel);
+    background: linear-gradient(180deg, var(--irw-panel-2), var(--irw-panel));
 }
 
-.intune-reboot-watch-stat-value {
-    color: #f2f8fb;
+.irw-stat-value {
+    color: #f3f8fb;
     font-size: 18px;
     font-weight: 700;
     line-height: 1.1;
 }
 
-.intune-reboot-watch-stat-label {
+.irw-stat-label {
     margin-top: 4px;
+    overflow: hidden;
     color: var(--irw-muted);
     font-size: 10px;
-    text-transform: uppercase;
     letter-spacing: .04em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
-.intune-reboot-watch-stat.is-good .intune-reboot-watch-stat-value { color: var(--irw-green); }
-.intune-reboot-watch-stat.is-accent .intune-reboot-watch-stat-value { color: var(--irw-cyan); }
-.intune-reboot-watch-stat.is-warn .intune-reboot-watch-stat-value { color: var(--irw-amber); }
-.intune-reboot-watch-stat.is-critical .intune-reboot-watch-stat-value { color: var(--irw-red); }
+.irw-stat.is-good .irw-stat-value { color: var(--irw-green); }
+.irw-stat.is-accent .irw-stat-value { color: var(--irw-cyan); }
+.irw-stat.is-warn .irw-stat-value { color: var(--irw-amber); }
+.irw-stat.is-critical .irw-stat-value { color: var(--irw-red); }
 
-.intune-reboot-watch-table {
+.irw-table {
     flex: 1 1 auto;
     margin: 0;
-    font-variant-numeric: tabular-nums;
+    overflow: auto;
 }
 
-.intune-reboot-watch-table th {
-    background: #0d1a29;
+.irw-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #0b1a29;
     color: var(--irw-muted);
     font-size: 10px;
+    letter-spacing: .03em;
     text-transform: uppercase;
 }
 
-.intune-reboot-watch-table td {
-    border-color: rgba(37, 56, 74, .7);
+.irw-table td {
+    border-color: rgba(37, 60, 79, .7);
 }
 
-.intune-reboot-watch-computer {
+.irw-table tr:hover td {
+    background: rgba(43, 214, 224, .035);
+}
+
+.irw-computer {
     color: #f1f7fa;
     font-family: Consolas, "Liberation Mono", monospace;
     font-weight: 700;
+    white-space: nowrap;
 }
 
-.intune-reboot-watch-uptime {
+.irw-uptime {
     display: inline-block;
     min-width: 58px;
     padding: 3px 7px;
-    border: 1px solid var(--irw-line);
+    border: 1px solid var(--irw-border);
     border-radius: 999px;
     text-align: center;
     font-weight: 700;
 }
 
-.intune-reboot-watch-uptime.is-ok { color: var(--irw-green); }
-.intune-reboot-watch-uptime.is-warn { color: var(--irw-amber); border-color: rgba(239,196,91,.45); }
-.intune-reboot-watch-uptime.is-high,
-.intune-reboot-watch-uptime.is-critical { color: var(--irw-red); border-color: rgba(240,107,118,.48); }
+.irw-uptime.is-ok { color: var(--irw-green); }
+.irw-uptime.is-warn { color: var(--irw-amber); border-color: rgba(239, 196, 92, .45); }
+.irw-uptime.is-high,
+.irw-uptime.is-critical { color: var(--irw-red); border-color: rgba(241, 109, 120, .48); }
 
-.intune-reboot-watch-footer {
+.irw-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
     flex: 0 0 auto;
     padding: 6px 10px;
-    border-top: 1px solid var(--irw-line);
+    border-top: 1px solid var(--irw-border);
     background: var(--irw-panel);
     color: var(--irw-muted);
     font-size: 10px;
-    text-align: right;
 }
 
-.intune-reboot-watch-error {
-    padding: 28px 18px;
-    color: #ffd0d4;
+.irw-error {
+    margin: 14px;
+    padding: 22px;
+    border: 1px solid rgba(241, 109, 120, .4);
+    border-radius: 5px;
+    background: rgba(241, 109, 120, .06);
+    color: #ffd5d9;
     text-align: center;
 }
 
+.irw-error-kicker {
+    margin-bottom: 7px;
+    color: var(--irw-red, #f16d78);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+}
+
+.irw-error-message {
+    line-height: 1.45;
+}
+
 @media (max-width: 1050px) {
-    .intune-reboot-watch-stats {
-        grid-template-columns: repeat(4, minmax(90px, 1fr));
+    .irw-stats {
+        grid-template-columns: repeat(4, minmax(84px, 1fr));
+    }
+
+    .irw-health-source {
+        display: none;
     }
 }
