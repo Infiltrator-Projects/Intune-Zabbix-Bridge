@@ -10,15 +10,38 @@ use DateTimeZone;
 use Modules\IntuneRebootWatch\Includes\FleetSummary;
 use Modules\IntuneRebootWatch\Includes\TelemetryState;
 use Modules\IntuneRebootWatch\Includes\WidgetForm;
+use RuntimeException;
 use Throwable;
 
 final class WidgetView extends CControllerDashboardWidgetView {
 
     private const SUMMARY_KEY = 'intune.windows.summary.json';
     private const PREFERRED_HOST_NAME = 'Microsoft Intune - Windows Fleet';
+    private const PREFERRED_GROUP_NAME = 'Microsoft Intune';
 
     protected function doAction(): void {
+        $configured = $this->normaliseItemIds($this->fields_values['itemid'] ?? []);
+        $bootstrap_error = null;
+
         $item = $this->findSummaryItem();
+
+        /*
+         * A freshly installed package should not require the operator to import
+         * a template and hand-create a trapper host before the widget can work.
+         * When the widget is using automatic source selection, bootstrap the
+         * small Zabbix-side data model through Zabbix's own API. This remains
+         * permission-aware and does not touch the database directly.
+         */
+        if ($item === null && $configured === []) {
+            try {
+                $this->ensureFleetDataModel();
+                $item = $this->findSummaryItem();
+            }
+            catch (Throwable $exception) {
+                $bootstrap_error = $exception->getMessage();
+            }
+        }
+
         $error = null;
         $summary = null;
         $rows = [];
@@ -30,11 +53,13 @@ final class WidgetView extends CControllerDashboardWidgetView {
         $received_at = '—';
 
         if ($item === null) {
-            $error = _(
-                'Intune fleet summary item was not found. Edit the widget and select '
-                .'the text item with key "intune.windows.summary.json", or link the '
-                .'Intune Zabbix Bridge template to the fleet host.'
-            );
+            $error = $bootstrap_error !== null
+                ? _('The Intune fleet data model could not be created automatically: ').$bootstrap_error
+                : _(
+                    'Intune fleet summary item was not found. Edit the widget and select '
+                    .'a compatible text item, or use an account permitted to create the '
+                    .'automatic Microsoft Intune fleet host and trapper items.'
+                );
         }
         else {
             $history = API::History()->get([
@@ -47,7 +72,11 @@ final class WidgetView extends CControllerDashboardWidgetView {
             ]);
 
             if ($history === []) {
-                $error = _('The Intune fleet summary item exists, but has never received data.');
+                $error = _(
+                    'INTUNE — Reboot Watch is installed and its Zabbix data channel is ready, '
+                    .'but no fleet telemetry has arrived yet. Configure/start the '
+                    .'Intune-Zabbix-Bridge collector.'
+                );
             }
             else {
                 try {
@@ -134,6 +163,172 @@ final class WidgetView extends CControllerDashboardWidgetView {
         }
 
         return $eligible[0] ?? null;
+    }
+
+    /**
+     * Create the small Zabbix-side trapper model needed by the collector.
+     *
+     * This is intentionally idempotent and uses only public Zabbix APIs. If the
+     * current frontend user cannot create host groups/hosts/items, the API call
+     * fails and the widget reports that rather than bypassing Zabbix security.
+     */
+    private function ensureFleetDataModel(): void {
+        $groupid = $this->ensureHostGroup();
+        $hostid = $this->ensureFleetHost($groupid);
+
+        $existing = API::Item()->get([
+            'output' => ['itemid', 'key_'],
+            'hostids' => [$hostid],
+            'preservekeys' => false
+        ]);
+
+        $existing_keys = [];
+        foreach ($existing as $item) {
+            $existing_keys[(string) ($item['key_'] ?? '')] = true;
+        }
+
+        $items = [];
+        foreach ($this->fleetItemDefinitions() as $definition) {
+            if (isset($existing_keys[$definition['key_']])) {
+                continue;
+            }
+
+            $items[] = ['hostid' => $hostid] + $definition;
+        }
+
+        if ($items !== []) {
+            $result = API::Item()->create($items);
+            if ($result === false) {
+                throw new RuntimeException(
+                    'Zabbix rejected creation of one or more Intune trapper items.'
+                );
+            }
+        }
+    }
+
+    private function ensureHostGroup(): string {
+        $groups = API::HostGroup()->get([
+            'output' => ['groupid', 'name'],
+            'filter' => ['name' => self::PREFERRED_GROUP_NAME],
+            'editable' => true,
+            'limit' => 1
+        ]);
+
+        if ($groups !== []) {
+            return (string) $groups[0]['groupid'];
+        }
+
+        $created = API::HostGroup()->create([
+            'name' => self::PREFERRED_GROUP_NAME
+        ]);
+
+        if ($created === false || empty($created['groupids'][0])) {
+            throw new RuntimeException(
+                'Zabbix did not allow creation of the Microsoft Intune host group.'
+            );
+        }
+
+        return (string) $created['groupids'][0];
+    }
+
+    private function ensureFleetHost(string $groupid): string {
+        $hosts = API::Host()->get([
+            'output' => ['hostid', 'host', 'name'],
+            'filter' => ['host' => self::PREFERRED_HOST_NAME],
+            'editable' => true,
+            'limit' => 1
+        ]);
+
+        if ($hosts !== []) {
+            return (string) $hosts[0]['hostid'];
+        }
+
+        $created = API::Host()->create([
+            'host' => self::PREFERRED_HOST_NAME,
+            'name' => self::PREFERRED_HOST_NAME,
+            'status' => HOST_STATUS_MONITORED,
+            'groups' => [
+                ['groupid' => $groupid]
+            ]
+        ]);
+
+        if ($created === false || empty($created['hostids'][0])) {
+            throw new RuntimeException(
+                'Zabbix did not allow creation of the Microsoft Intune fleet host.'
+            );
+        }
+
+        return (string) $created['hostids'][0];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function fleetItemDefinitions(): array {
+        return [
+            [
+                'name' => 'Intune: Windows reporting devices',
+                'key_' => 'intune.windows.reporting.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows fresh telemetry devices',
+                'key_' => 'intune.windows.fresh.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows stale telemetry devices',
+                'key_' => 'intune.windows.stale.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Maximum Windows uptime',
+                'key_' => 'intune.windows.max.uptime.days',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_FLOAT,
+                'units' => 'd'
+            ],
+            [
+                'name' => 'Intune: Windows uptime >= 7 days',
+                'key_' => 'intune.windows.uptime.over7.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows uptime >= 14 days',
+                'key_' => 'intune.windows.uptime.over14.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows uptime >= 30 days',
+                'key_' => 'intune.windows.uptime.over30.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Last telemetry collection',
+                'key_' => 'intune.windows.last.collection.epoch',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64,
+                'units' => 'unixtime'
+            ],
+            [
+                'name' => 'Intune: Top 10 longest uptime',
+                'key_' => 'intune.windows.top10',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_TEXT
+            ],
+            [
+                'name' => 'Intune: Windows fleet summary JSON',
+                'key_' => self::SUMMARY_KEY,
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_TEXT
+            ]
+        ];
     }
 
     private function prepareRows(array $rows): array {

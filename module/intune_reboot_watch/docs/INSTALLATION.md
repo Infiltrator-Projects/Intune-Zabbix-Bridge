@@ -10,11 +10,19 @@ It installs the collector CLI, systemd service/timer, persistent configuration, 
 
 After installing/upgrading, open **Administration → General → Modules → Scan directory**, enable **INTUNE — Reboot Watch**, then refresh the browser.
 
-Import the supplied template from:
+## Automatic Zabbix-side provisioning
 
-`/usr/share/intune-zabbix-bridge/zabbix/template_intune_zabbix_bridge.yaml`
+After the module is enabled, adding the widget with its default automatic source selection creates the required Zabbix objects through the authenticated Zabbix API if they do not already exist:
 
-Create/link the conventional host **Microsoft Intune - Windows Fleet**.
+- host group `Microsoft Intune`;
+- host `Microsoft Intune - Windows Fleet`;
+- ten trapper items used by the collector.
+
+The package still ships `/usr/share/intune-zabbix-bridge/zabbix/template_intune_zabbix_bridge.yaml` for portability/manual use, but importing it is no longer required for the normal path.
+
+## Collector configuration
+
+Configure `/etc/intune-zabbix-bridge/bridge.env` with Entra tenant ID, client ID, client secret, telemetry-script ID and Zabbix destination. Then enable/start the bridge timer.
 
 ## Portable widget-only installer
 
@@ -22,11 +30,7 @@ Create/link the conventional host **Microsoft Intune - Windows Fleet**.
 ./tools/build-installer.sh
 ```
 
-This creates `dist/intune-zabbix-reboot-watch-<version>.run`. It installs only the Zabbix frontend module.
-
-## Collector configuration
-
-Configure `/etc/intune-zabbix-bridge/bridge.env` with Entra tenant ID, client ID, client secret, telemetry-script ID and Zabbix destination.
+This installs only the Zabbix frontend module.
 
 ## Upgrade
 
@@ -34,4 +38,4 @@ Debian upgrades preserve `bridge.env` as a conffile. Rescan modules and hard-ref
 
 ## Removal
 
-Package removal stops/disables the bridge timer and removes program/module files. Existing Zabbix history remains governed by Zabbix retention.
+Package removal stops/disables the bridge timer and removes program/module files. Existing Zabbix objects/history remain governed by Zabbix.

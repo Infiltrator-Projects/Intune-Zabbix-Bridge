@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 — 2026-09-02
+
+- the native widget now automatically creates its Zabbix host group, fleet host and ten trapper items on first use;
+- manual template import/linking is no longer required for the normal path;
+- automatic provisioning uses public Zabbix APIs and respects the current frontend user's permissions.
+
 ## 0.3.0 — 2026-09-02
 
 - promoted the Zabbix frontend from a thin summary display to a first-class native module;

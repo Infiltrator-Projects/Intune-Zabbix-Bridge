@@ -6,7 +6,15 @@ if ($source === false) {
     exit(1);
 }
 
-foreach (['FleetSummary', 'TelemetryState', 'WidgetForm'] as $symbol) {
+foreach ([
+    'FleetSummary',
+    'TelemetryState',
+    'WidgetForm',
+    'ensureFleetDataModel',
+    'API::HostGroup()->create',
+    'API::Host()->create',
+    'API::Item()->create'
+] as $symbol) {
     if (strpos($source, $symbol) === false) {
         fwrite(STDERR, "FAIL: WidgetView no longer references {$symbol}.\n");
         exit(1);
