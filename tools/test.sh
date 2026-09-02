@@ -30,8 +30,9 @@ echo "[8/12] Python collector tests"
 PYTHONPATH="$ROOT/src" python3 -m unittest discover -s "$ROOT/tests" -p 'test_*.py' -v
 echo "[9/12] Python syntax"
 PYTHONPATH="$ROOT/src" python3 -m compileall -q "$ROOT/src"
-echo "[10/12] Shell syntax"
+echo "[10/12] Shell/Python setup syntax"
 while IFS= read -r -d '' file; do bash -n "$file"; done < <(find "$ROOT/tools" -type f -name '*.sh' -print0)
+python3 -m py_compile "$ROOT/packaging/linux/config-helper" "$ROOT/src/intune_zabbix_bridge/config_gui.py"
 echo "[11/12] Portable installer"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -52,6 +53,12 @@ if command -v dpkg-deb >/dev/null 2>&1; then
     installed="$extract/usr/share/zabbix/modules/intune_reboot_watch/manifest.json"
     [[ -f "$installed" ]]
     [[ "$(jq -r '.version' "$installed")" == "$VERSION" ]]
+    [[ -x "$extract/usr/bin/intune-zabbix-bridge-config" ]]
+    [[ -x "$extract/usr/lib/intune-zabbix-bridge/config-helper" ]]
+    [[ -f "$extract/usr/share/applications/intune-zabbix-bridge-config.desktop" ]]
+    dpkg-deb --field "$deb" Depends | grep -Fq 'python3-gi'
+    dpkg-deb --field "$deb" Depends | grep -Fq 'gir1.2-gtk-3.0'
+    dpkg-deb --field "$deb" Depends | grep -Fq 'policykit-1'
 fi
 if grep -R -F "$VERSION" "$ROOT/tools" "$ROOT/.github" >/dev/null; then
     echo "ERROR: current release version is hard-coded in tools or CI." >&2
