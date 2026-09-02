@@ -1,3 +1,1 @@
-"""Intune Zabbix Bridge."""
-
-__version__ = "0.2.0"
+"""Intune Zabbix Bridge package.\n\nRelease identity is owned by module/intune_reboot_watch/manifest.json.\n"""\n

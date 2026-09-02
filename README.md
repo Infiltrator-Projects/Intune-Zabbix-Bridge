@@ -1,92 +1,60 @@
 # Intune-Zabbix-Bridge
 
-A read-only bridge that turns Microsoft Intune device telemetry into useful Zabbix fleet monitoring.
+**Release:** 0.3.0  
+**Platform:** Microsoft Intune + Zabbix 7.0 LTS  
+**Delivery:** Infiltrator APT / Linux Mint Software Manager
 
-The first integration is **Windows reboot telemetry**: Intune already knows each reporting laptop's actual Windows `LastBootUpTime`; this project reads those results centrally, ranks the longest-running machines, and publishes the fleet summary into Zabbix.
+Intune-Zabbix-Bridge is a read-only bridge and native Zabbix dashboard module for central Windows reboot telemetry.
 
-## What it gives Zabbix
+The project now has two equally first-class halves:
 
-- Top 10 Windows machines with the longest current uptime
-- Last restart time and signed-in user for each top-10 entry
-- Number of devices reporting reboot telemetry
-- Fresh versus stale telemetry counts
-- Maximum current uptime
-- Counts above 7, 14 and 30 days uptime
-- Last telemetry collection timestamp
-- JSON fleet summary for future dependent items / automation
+- a Python collector that reads the existing Intune reboot-telemetry device-health-script results through Microsoft Graph and publishes fleet metrics with `zabbix_sender`;
+- a native Zabbix 7.0 frontend widget, **INTUNE — Reboot Watch**, installed under `/usr/share/zabbix/modules/intune_reboot_watch`.
 
-## Debian package
+## What the widget shows
 
-A native Debian package is built by GitHub Actions:
+- top 10 longest-running fresh Windows devices;
+- actual Windows last restart time;
+- current user;
+- endpoint telemetry collection time and age;
+- reporting, fresh and stale device counts;
+- maximum fleet uptime;
+- 7, 14 and 30 day uptime counts;
+- collector-current / collector-stale state.
 
-`intune-zabbix-bridge_0.1.0_all.deb`
+## Zabbix-native design
 
-It installs the collector, systemd service/timer, Zabbix template and persistent configuration under standard Debian paths. The package does not start collection until credentials are configured.
+The widget has the same engineering model used by WHERE’S WALLY: a manifest, widget class, native edit form, controller, testable helper classes, dedicated view, scoped CSS/JS, package validation, portable installer and operational/security/development/testing documentation.
 
-Build locally with:
+`module/intune_reboot_watch/manifest.json` is the release-version source of truth. Builders derive package/installer versions from it.
 
-```bash
-./scripts/build-deb.sh
-```
+## Installation
 
-The output is written to `dist/`.
+The normal installation path is the Infiltrator Software repository in Linux Mint Software Manager. Install or update **Intune Zabbix Bridge**.
 
-## Safety
+Then in Zabbix:
 
-The bridge never contacts, wakes, reboots or remediates laptops. Microsoft Graph access is read-only. A laptop can be at school, at home or on another network; if it has reported into Intune, Zabbix can use the result.
+1. **Administration → General → Modules → Scan directory**.
+2. Enable **INTUNE — Reboot Watch**.
+3. Refresh the browser.
+4. Import `/usr/share/intune-zabbix-bridge/zabbix/template_intune_zabbix_bridge.yaml` if the bridge template is not already present.
+5. Link it to a host named **Microsoft Intune - Windows Fleet**.
 
-Stale telemetry is deliberately excluded from the top-10 ranking by default. This prevents a device that disappeared months ago from being presented as a currently-running machine.
+Configure the collector in `/etc/intune-zabbix-bridge/bridge.env` before enabling its timer.
 
-## Architecture
+## Documentation
 
-```text
-Windows laptop
-    |
-    | Intune Management Extension
-    v
-Windows - Reboot Telemetry
-    |
-    | Microsoft Graph (read only)
-    v
-Intune-Zabbix-Bridge
-    |
-    | zabbix_sender
-    v
-Microsoft Intune - Windows Fleet
-    |
-    +-- Top 10 longest uptime
-    +-- Reporting / fresh / stale counts
-    +-- Maximum uptime
-    +-- 7 / 14 / 30 day counts
-```
+- `module/intune_reboot_watch/docs/ARCHITECTURE.md`
+- `module/intune_reboot_watch/docs/INSTALLATION.md`
+- `module/intune_reboot_watch/docs/OPERATIONS.md`
+- `module/intune_reboot_watch/docs/SECURITY.md`
+- `module/intune_reboot_watch/docs/DEVELOPMENT.md`
+- `module/intune_reboot_watch/docs/TESTING.md`
 
-The collector has no third-party Python dependencies; it uses the Python standard library for OAuth client credentials, Graph calls, pagination, retry handling and telemetry parsing. `zabbix_sender` is used for Zabbix delivery.
-
-## Quick start
-
-See [`docs/SETUP.md`](docs/SETUP.md).
-
-Dry-run example after configuration:
+## Validation
 
 ```bash
-intune-zabbix-bridge --dry-run
+./tools/test.sh
 ```
 
-Example output:
-
-```text
-#  COMPUTER                 UPTIME   LAST RESTART          USER
--- ------------------------ -------- --------------------- ------------------------------
- 1 S25-28ABC1234             18.7d  14/08/2026 08:22 AM  user@example.edu.au
- 2 T25-28DEF5678             14.3d  18/08/2026 03:51 PM  user@example.edu.au
-```
-
-## Current Intune source
-
-The deployment currently expects the existing Intune device-health script named `Windows - Reboot Telemetry`, whose output format is:
-
-```text
-DEVICE=<computer>;LASTBOOT=<ISO-8601>;UPTIME_HOURS=<hours>
-```
-
-The source script ID is configuration, not code, so the bridge can be moved to another tenant or collector without modification.
+The suite validates PHP, JavaScript, Python, shell, helper contracts, source contracts, Debian packaging and the portable module installer.

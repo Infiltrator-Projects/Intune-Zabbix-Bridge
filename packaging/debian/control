@@ -1,11 +1,12 @@
 Package: intune-zabbix-bridge
-Version: 0.2.0
+Version: 0.0.0
 Section: admin
 Priority: optional
 Architecture: all
 Maintainer: Infiltrator Projects
 Depends: python3 (>= 3.11), zabbix-sender, ca-certificates, zabbix-frontend-php (>= 7.0)
+Homepage: https://github.com/Infiltrator-Projects/Intune-Zabbix-Bridge
 Description: Microsoft Intune telemetry bridge and Zabbix reboot-watch widget
- Collects existing Microsoft Intune Windows reboot telemetry through Microsoft
- Graph and publishes fleet-level metrics to Zabbix. Includes the INTUNE Reboot
- Watch dashboard widget. The bridge does not contact or control managed endpoints.
+ Reads existing Microsoft Intune Windows reboot telemetry through Microsoft Graph
+ and publishes fleet metrics to Zabbix. Includes the native INTUNE Reboot Watch
+ dashboard widget. The bridge does not contact or control managed endpoints.

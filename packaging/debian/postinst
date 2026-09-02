@@ -6,7 +6,12 @@ if ! getent group intune-zabbix >/dev/null 2>&1; then
 fi
 
 if ! getent passwd intune-zabbix >/dev/null 2>&1; then
-    adduser --system         --ingroup intune-zabbix         --home /nonexistent         --no-create-home         --shell /usr/sbin/nologin         intune-zabbix >/dev/null
+    adduser --system \
+        --ingroup intune-zabbix \
+        --home /nonexistent \
+        --no-create-home \
+        --shell /usr/sbin/nologin \
+        intune-zabbix >/dev/null
 fi
 
 if [ -f /etc/intune-zabbix-bridge/bridge.env ]; then
@@ -18,11 +23,11 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload >/dev/null 2>&1 || true
 fi
 
-echo
-echo "Intune-Zabbix-Bridge installed."
-echo "Zabbix widget installed: INTUNE — Reboot Watch"
-echo "In Zabbix: Administration -> General -> Modules -> Scan directory"
-echo "Enable 'INTUNE — Reboot Watch', then refresh the browser."
-echo "Configure /etc/intune-zabbix-bridge/bridge.env before enabling the collector timer."
+printf "\nIntune-Zabbix-Bridge installed.\n"
+printf "Zabbix widget: INTUNE — Reboot Watch\n"
+printf "Open Zabbix: Administration -> General -> Modules -> Scan directory\n"
+printf "Enable the widget module and refresh the browser.\n"
+printf "Collector config: /etc/intune-zabbix-bridge/bridge.env\n"
+printf "The collector timer is not automatically enabled until configuration is supplied.\n"
 
 exit 0
