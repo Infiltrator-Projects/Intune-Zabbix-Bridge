@@ -1,0 +1,119 @@
+div.dashboard-widget-intune_reboot_watch {
+    padding: 0;
+    overflow: hidden;
+}
+
+.intune-reboot-watch {
+    --irw-panel: #0b1724;
+    --irw-panel-2: #102033;
+    --irw-line: #25384a;
+    --irw-text: #d9e5ed;
+    --irw-muted: #829bad;
+    --irw-cyan: #24d3df;
+    --irw-green: #42d48b;
+    --irw-amber: #efc45b;
+    --irw-red: #f06b76;
+
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 260px;
+    background: #08111c;
+    color: var(--irw-text);
+}
+
+.intune-reboot-watch-stats {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(90px, 1fr));
+    gap: 7px;
+    padding: 10px;
+    border-bottom: 1px solid var(--irw-line);
+}
+
+.intune-reboot-watch-stat {
+    min-width: 0;
+    padding: 8px 9px;
+    border: 1px solid var(--irw-line);
+    border-radius: 5px;
+    background: var(--irw-panel);
+}
+
+.intune-reboot-watch-stat-value {
+    color: #f2f8fb;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.intune-reboot-watch-stat-label {
+    margin-top: 4px;
+    color: var(--irw-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.intune-reboot-watch-stat.is-good .intune-reboot-watch-stat-value { color: var(--irw-green); }
+.intune-reboot-watch-stat.is-accent .intune-reboot-watch-stat-value { color: var(--irw-cyan); }
+.intune-reboot-watch-stat.is-warn .intune-reboot-watch-stat-value { color: var(--irw-amber); }
+.intune-reboot-watch-stat.is-critical .intune-reboot-watch-stat-value { color: var(--irw-red); }
+
+.intune-reboot-watch-table {
+    flex: 1 1 auto;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.intune-reboot-watch-table th {
+    background: #0d1a29;
+    color: var(--irw-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.intune-reboot-watch-table td {
+    border-color: rgba(37, 56, 74, .7);
+}
+
+.intune-reboot-watch-computer {
+    color: #f1f7fa;
+    font-family: Consolas, "Liberation Mono", monospace;
+    font-weight: 700;
+}
+
+.intune-reboot-watch-uptime {
+    display: inline-block;
+    min-width: 58px;
+    padding: 3px 7px;
+    border: 1px solid var(--irw-line);
+    border-radius: 999px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.intune-reboot-watch-uptime.is-ok { color: var(--irw-green); }
+.intune-reboot-watch-uptime.is-warn { color: var(--irw-amber); border-color: rgba(239,196,91,.45); }
+.intune-reboot-watch-uptime.is-high,
+.intune-reboot-watch-uptime.is-critical { color: var(--irw-red); border-color: rgba(240,107,118,.48); }
+
+.intune-reboot-watch-footer {
+    flex: 0 0 auto;
+    padding: 6px 10px;
+    border-top: 1px solid var(--irw-line);
+    background: var(--irw-panel);
+    color: var(--irw-muted);
+    font-size: 10px;
+    text-align: right;
+}
+
+.intune-reboot-watch-error {
+    padding: 28px 18px;
+    color: #ffd0d4;
+    text-align: center;
+}
+
+@media (max-width: 1050px) {
+    .intune-reboot-watch-stats {
+        grid-template-columns: repeat(4, minmax(90px, 1fr));
+    }
+}
