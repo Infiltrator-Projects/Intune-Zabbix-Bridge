@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 — 2026-09-02
+
+- added the Linux Mint graphical configuration utility;
+- added PolicyKit-backed protected config writing;
+- Save & Start Collector now writes the bridge configuration, enables the timer and forces the first collection;
+- normal collector setup no longer requires terminal editing or file-manager admin paths.
+
 ## 0.4.0 — 2026-09-02
 
 - made the widget self-provision the required Zabbix host group, fleet host and trapper items on first use;
