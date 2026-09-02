@@ -1,1 +1,4 @@
-"""Intune Zabbix Bridge package.\n\nRelease identity is owned by module/intune_reboot_watch/manifest.json.\n"""\n
+"""Intune Zabbix Bridge package.
+
+Release identity is owned by module/intune_reboot_watch/manifest.json.
+"""
