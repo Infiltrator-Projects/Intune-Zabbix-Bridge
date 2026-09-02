@@ -20,7 +20,9 @@ fi
 
 echo
 echo "Intune-Zabbix-Bridge installed."
-echo "Configure /etc/intune-zabbix-bridge/bridge.env before enabling the timer."
-echo "Then run: sudo systemctl enable --now intune-zabbix-bridge.timer"
+echo "Zabbix widget installed: INTUNE — Reboot Watch"
+echo "In Zabbix: Administration -> General -> Modules -> Scan directory"
+echo "Enable 'INTUNE — Reboot Watch', then refresh the browser."
+echo "Configure /etc/intune-zabbix-bridge/bridge.env before enabling the collector timer."
 
 exit 0
