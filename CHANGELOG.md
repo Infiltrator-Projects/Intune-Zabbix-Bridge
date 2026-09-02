@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 — 2026-09-02
+
+- aligned release metadata after the private-distribution hardening update;
+- retains the confidential/private-only packaging policy introduced in 0.6.0.
+
 ## 0.6.0 — 2026-09-02
 
 - replaced 0.5's GUI credential form with one universal package plus one deployment-specific environment file;
