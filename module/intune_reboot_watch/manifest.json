@@ -1,0 +1,31 @@
+{
+  "manifest_version": 2.0,
+  "id": "intune_reboot_watch",
+  "type": "widget",
+  "name": "INTUNE — Reboot Watch",
+  "namespace": "IntuneRebootWatch",
+  "version": "0.2.0",
+  "author": "Infiltrator Projects",
+  "description": "Top Windows uptime and reboot telemetry from Microsoft Intune.",
+  "actions": {
+    "widget.intune_reboot_watch.view": {
+      "class": "WidgetView"
+    }
+  },
+  "widget": {
+    "size": {
+      "width": 72,
+      "height": 10
+    },
+    "js_class": "WidgetIntuneRebootWatch",
+    "refresh_rate": 60
+  },
+  "assets": {
+    "css": [
+      "widget.css"
+    ],
+    "js": [
+      "class.widget.js"
+    ]
+  }
+}
