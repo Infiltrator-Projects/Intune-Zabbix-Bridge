@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+
+if ! getent group intune-zabbix >/dev/null 2>&1; then
+    addgroup --system intune-zabbix >/dev/null
+fi
+
+if ! getent passwd intune-zabbix >/dev/null 2>&1; then
+    adduser --system         --ingroup intune-zabbix         --home /nonexistent         --no-create-home         --shell /usr/sbin/nologin         intune-zabbix >/dev/null
+fi
+
+if [ -f /etc/intune-zabbix-bridge/bridge.env ]; then
+    chown root:intune-zabbix /etc/intune-zabbix-bridge/bridge.env
+    chmod 0640 /etc/intune-zabbix-bridge/bridge.env
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+
+echo
+echo "Intune-Zabbix-Bridge installed."
+echo "Configure /etc/intune-zabbix-bridge/bridge.env before enabling the timer."
+echo "Then run: sudo systemctl enable --now intune-zabbix-bridge.timer"
+
+exit 0
