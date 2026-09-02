@@ -1,0 +1,3 @@
+#!/usr/bin/python3
+from intune_zabbix_bridge.config_gui import main
+raise SystemExit(main())

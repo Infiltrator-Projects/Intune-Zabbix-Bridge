@@ -19,8 +19,10 @@ root="$stage/${PKG}_${VERSION}_${ARCH}"
 
 mkdir -p "$root/DEBIAN" \
     "$root/usr/bin" \
+    "$root/usr/lib/intune-zabbix-bridge" \
     "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge" \
     "$root/usr/lib/systemd/system" \
+    "$root/usr/share/applications" \
     "$root/usr/share/intune-zabbix-bridge/zabbix" \
     "$root/usr/share/zabbix/modules" \
     "$root/usr/share/doc/$PKG" \
@@ -31,8 +33,10 @@ install -m 0755 "$ROOT_DIR/packaging/debian/postinst" "$root/DEBIAN/postinst"
 install -m 0755 "$ROOT_DIR/packaging/debian/prerm" "$root/DEBIAN/prerm"
 install -m 0755 "$ROOT_DIR/packaging/debian/postrm" "$root/DEBIAN/postrm"
 install -m 0644 "$ROOT_DIR/packaging/debian/conffiles" "$root/DEBIAN/conffiles"
+
 install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/__init__.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/__init__.py"
 install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/collector.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/collector.py"
+install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/config_gui.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/config_gui.py"
 
 cat > "$root/usr/bin/intune-zabbix-bridge" <<'PY'
 #!/usr/bin/python3
@@ -40,6 +44,10 @@ from intune_zabbix_bridge.collector import main
 raise SystemExit(main())
 PY
 chmod 0755 "$root/usr/bin/intune-zabbix-bridge"
+
+install -m 0755 "$ROOT_DIR/packaging/linux/intune-zabbix-bridge-config" "$root/usr/bin/intune-zabbix-bridge-config"
+install -m 0755 "$ROOT_DIR/packaging/linux/config-helper" "$root/usr/lib/intune-zabbix-bridge/config-helper"
+install -m 0644 "$ROOT_DIR/packaging/linux/intune-zabbix-bridge-config.desktop" "$root/usr/share/applications/intune-zabbix-bridge-config.desktop"
 
 install -m 0644 "$ROOT_DIR/packaging/debian/intune-zabbix-bridge.service" "$root/usr/lib/systemd/system/intune-zabbix-bridge.service"
 install -m 0644 "$ROOT_DIR/packaging/debian/intune-zabbix-bridge.timer" "$root/usr/lib/systemd/system/intune-zabbix-bridge.timer"

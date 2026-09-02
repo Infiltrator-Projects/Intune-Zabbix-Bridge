@@ -1,26 +1,18 @@
 # Changelog
 
+## 0.5.0 — 2026-09-02
+
+- added a native Linux Mint GTK configuration utility available from the application menu;
+- added a PolicyKit-backed privileged helper so credentials can be saved to /etc without terminal editing;
+- the GUI now enables the timer, runs the collector immediately, and reports first-run failures;
+- normal setup no longer requires terminal commands, file-manager admin paths, or drag-and-drop configuration.
+
 ## 0.4.0 — 2026-09-02
 
-- the native widget now automatically creates its Zabbix host group, fleet host and ten trapper items on first use;
+- the native widget automatically creates its Zabbix host group, fleet host and ten trapper items on first use;
 - manual template import/linking is no longer required for the normal path;
 - automatic provisioning uses public Zabbix APIs and respects the current frontend user's permissions.
 
 ## 0.3.0 — 2026-09-02
 
-- promoted the Zabbix frontend from a thin summary display to a first-class native module;
-- added native widget configuration and deterministic source-item resolution;
-- split summary parsing and freshness policy into independently tested helpers;
-- added explicit current/stale/error operational states;
-- added full module documentation and regression coverage;
-- made the module manifest the release-version source for builders;
-- added portable `.run` widget installer;
-- consolidated CI/build logic and removed duplicate legacy packaging paths.
-
-## 0.2.0 — 2026-09-02
-
-- added the first native Zabbix widget module to the Debian package.
-
-## 0.1.0 — 2026-09-02
-
-- initial read-only Intune-to-Zabbix collector and template.
+- promoted the Zabbix frontend to a first-class native module with native configuration, tests and full documentation.
