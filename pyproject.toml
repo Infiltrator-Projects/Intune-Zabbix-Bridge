@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "intune-zabbix-bridge"
-version = "0.1.0"
-description = "Read-only Microsoft Intune telemetry bridge for Zabbix"
+version = "0.2.0"
+description = "Microsoft Intune telemetry bridge and Zabbix reboot-watch widget"
 requires-python = ">=3.11"
 authors = [
   { name = "Infiltrator Projects" }
