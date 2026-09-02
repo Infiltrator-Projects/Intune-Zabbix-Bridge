@@ -1,6 +1,6 @@
 # INTUNE — Reboot Watch
 
-**Release:** 0.4.0  
+**Release:** 0.5.0  
 **Platform:** Zabbix 7.0 LTS  
 **Type:** Zabbix dashboard widget/module  
 **Project:** Intune-Zabbix-Bridge
@@ -26,3 +26,8 @@ The native Zabbix editor exposes only persistent choices:
 - optional explicit fleet summary item;
 - rows displayed (1–10);
 - collector stale threshold (5–1440 minutes).
+
+
+## Linux Mint graphical setup
+
+The Debian package also installs **Intune Zabbix Bridge Setup** in the Mint application menu. It accepts Tenant ID, Client/Application ID and Client secret, then uses PolicyKit to save the protected collector configuration and start the service/timer without terminal commands.
