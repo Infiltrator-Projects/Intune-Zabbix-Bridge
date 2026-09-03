@@ -8,6 +8,8 @@ use Throwable;
 
 final class TelemetryState {
 
+    private const MAXIMUM_FUTURE_SKEW_SECONDS = 300;
+
     public function evaluate(
         string $generated_at,
         DateTimeImmutable $now,
@@ -36,10 +38,16 @@ final class TelemetryState {
             ];
         }
 
-        $age_minutes = max(
-            0,
-            $now_utc->getTimestamp() - $generated->getTimestamp()
-        ) / 60;
+        $skew_seconds = $generated->getTimestamp() - $now_utc->getTimestamp();
+        if ($skew_seconds > self::MAXIMUM_FUTURE_SKEW_SECONDS) {
+            return [
+                'status' => 'unknown',
+                'age_minutes' => null,
+                'label' => 'Collector clock is ahead'
+            ];
+        }
+
+        $age_minutes = max(0, -$skew_seconds) / 60;
 
         if ($age_minutes > $stale_minutes) {
             return [
