@@ -7,7 +7,7 @@ zabbix_export:
     - uuid: 821e3ec0c9df4f65bc20221b1c599102
       template: 'Intune Zabbix Bridge'
       name: 'Intune Zabbix Bridge'
-      description: 'Read-only Microsoft Intune fleet telemetry delivered by Intune-Zabbix-Bridge.'
+      description: 'Read-only Microsoft Intune fleet telemetry delivered by Intune-Zabbix-Bridge. Trapper input is restricted to the local collector by default.'
       groups:
         - name: Templates/Custom
       items:
@@ -16,6 +16,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.reporting.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -24,6 +25,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.fresh.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -32,6 +34,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.stale.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -40,6 +43,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.ring.reporting.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -48,6 +52,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.ring.one.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -56,6 +61,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.ring.none.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -64,6 +70,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.ring.multiple.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -72,6 +79,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.reboot.missed.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -80,6 +88,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.reboot.current.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -88,6 +97,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.reboot.unknown.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -96,6 +106,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.reboot.notactive.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -104,6 +115,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.max.uptime.days
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: FLOAT
@@ -113,6 +125,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.uptime.over7.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -121,6 +134,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.uptime.over14.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -129,6 +143,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.uptime.over30.count
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: 365d
           value_type: UNSIGNED
@@ -137,6 +152,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.last.collection.epoch
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 90d
           trends: '0'
           units: unixtime
@@ -146,6 +162,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.top10
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 30d
           trends: '0'
           value_type: TEXT
@@ -154,6 +171,7 @@ zabbix_export:
           type: TRAP
           key: intune.windows.summary.json
           delay: '0'
+          allowed_hosts: '127.0.0.1,::1'
           history: 30d
           trends: '0'
           value_type: TEXT
