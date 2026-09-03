@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.5 — 2026-09-04
+
+- Changed the authoritative fleet identity from computer name to immutable Intune `managedDevice.id`; duplicate names no longer collapse or exchange reboot telemetry.
+- Accepts reboot telemetry only when the expanded remediation run state identifies its managed device.
+- Treats legacy update-ring status identity conservatively: a ring report is attached only when its reported name/UPN uniquely identifies one current managed device.
+- Keeps every ring/reboot/telemetry fault row visible regardless of the ordinary row limit or search filter.
+- Made the dashboard controller read-only; opening the widget no longer creates Zabbix groups, hosts or items.
+- Treats materially future collector timestamps as Unknown.
+- Uses the summary JSON as the dashboard generation commit marker, publishing it only after all companion metrics succeed.
+- Requires the packaged template, whose trapper items accept loopback submissions only by default.
+- Moves deployment configuration into a protected root-only import inbox instead of trusting every user's Downloads directory.
+- Adds regression coverage for the new identity, security, publishing and packaging boundaries.
+
 ## 0.7.4 — 2026-09-03
 
 - Restored the actual purpose of Reboot Watch: identify whether each ring-covered Windows workstation has satisfied the required weekly restart.
