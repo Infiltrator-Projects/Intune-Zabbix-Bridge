@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.3 - 2026-09-03
+
+- Reworked Reboot Watch around three independent signals: managed Windows inventory, Windows Update Ring device status, and reboot telemetry.
+- Devices that have reported an update ring remain visible even when reboot telemetry is missing.
+- Devices with no ring reported or multiple rings reported are explicit faults instead of silently disappearing.
+- Added ring names, ring configuration status, ring last-report time, ring health counters and ring-aware search/sort.
+- Supersedes the incomplete 0.7.2 inventory-plus-reboot-only model.
+
 ## 0.7.2 - 2026-09-03
 
 - Made the managed Windows inventory authoritative for Reboot Watch and left-joined reboot telemetry onto it.
@@ -21,7 +29,7 @@
 ## 0.6.1 — 2026-09-02
 
 - aligned release metadata after the private-distribution hardening update;
-- retains the confidential/private-only packaging policy introduced in 0.6.0.
+- retains the confidential/private-only distribution policy introduced in 0.6.0.
 
 ## 0.6.0 — 2026-09-02
 
