@@ -1,9 +1,8 @@
 [Unit]
-Description=Watch Downloads for Intune Zabbix Bridge configuration
+Description=Watch protected Intune Zabbix Bridge configuration inbox
 
 [Path]
-PathExistsGlob=/home/*/Downloads/intune-zabbix-bridge.env
-PathExistsGlob=/root/Downloads/intune-zabbix-bridge.env
+PathExists=/etc/intune-zabbix-bridge/import/intune-zabbix-bridge.env
 Unit=intune-zabbix-bridge-import.service
 
 [Install]
