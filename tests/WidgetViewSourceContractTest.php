@@ -10,21 +10,24 @@ foreach ([
     'FleetSummary',
     'TelemetryState',
     'WidgetForm',
-    'ensureFleetDataModel',
-    'API::HostGroup()->create',
-    'API::Host()->create',
-    'API::Item()->create',
-    'intune.windows.ring.reporting.count',
-    'intune.windows.ring.one.count',
-    'intune.windows.ring.none.count',
-    'intune.windows.ring.multiple.count',
-    'intune.windows.reboot.missed.count',
-    'intune.windows.reboot.current.count',
-    'intune.windows.reboot.unknown.count',
-    'intune.windows.reboot.notactive.count'
+    'API::History()->get',
+    'intune.windows.summary.json',
+    "'is_fault'"
 ] as $symbol) {
     if (strpos($source, $symbol) === false) {
         fwrite(STDERR, "FAIL: WidgetView no longer references {$symbol}.\n");
+        exit(1);
+    }
+}
+
+foreach ([
+    'ensureFleetDataModel',
+    'API::HostGroup()->create',
+    'API::Host()->create',
+    'API::Item()->create'
+] as $forbidden) {
+    if (strpos($source, $forbidden) !== false) {
+        fwrite(STDERR, "FAIL: dashboard rendering regained provisioning side effect {$forbidden}.\n");
         exit(1);
     }
 }
