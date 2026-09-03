@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1 — 2026-09-03
+
+- Rebuilt and requalified the current bridge on GitHub-hosted CI for the coordinated project release refresh.
+- Preserved the 0.7.0 import, packaging and Zabbix integration behaviour unchanged.
+
 ## 0.7.0 — 2026-09-02
 
 - added case-insensitive computer-name and username search across fresh fleet telemetry;
