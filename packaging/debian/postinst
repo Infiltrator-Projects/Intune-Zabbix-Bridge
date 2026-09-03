@@ -1,20 +1,31 @@
 #!/bin/sh
 set -e
-if ! getent group intune-zabbix >/dev/null 2>&1; then addgroup --system intune-zabbix >/dev/null; fi
+
+if ! getent group intune-zabbix >/dev/null 2>&1; then
+    addgroup --system intune-zabbix >/dev/null
+fi
 if ! getent passwd intune-zabbix >/dev/null 2>&1; then
     adduser --system --ingroup intune-zabbix --home /nonexistent --no-create-home --shell /usr/sbin/nologin intune-zabbix >/dev/null
 fi
+
 mkdir -p /etc/intune-zabbix-bridge
 chown root:intune-zabbix /etc/intune-zabbix-bridge
 chmod 0750 /etc/intune-zabbix-bridge
+
+mkdir -p /etc/intune-zabbix-bridge/import
+chown root:root /etc/intune-zabbix-bridge/import
+chmod 0700 /etc/intune-zabbix-bridge/import
+
 if [ -f /etc/intune-zabbix-bridge/bridge.env ]; then
     chown root:intune-zabbix /etc/intune-zabbix-bridge/bridge.env
     chmod 0640 /etc/intune-zabbix-bridge/bridge.env
 fi
+
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload >/dev/null
     systemctl enable intune-zabbix-bridge-import.path >/dev/null
     systemctl start intune-zabbix-bridge-import.path
+
     if [ -s /etc/intune-zabbix-bridge/bridge.env ] &&
        grep -q '^AZURE_TENANT_ID=.' /etc/intune-zabbix-bridge/bridge.env &&
        grep -q '^AZURE_CLIENT_ID=.' /etc/intune-zabbix-bridge/bridge.env &&
@@ -24,7 +35,9 @@ if command -v systemctl >/dev/null 2>&1; then
         systemctl restart intune-zabbix-bridge.service >/dev/null 2>&1 || true
     fi
 fi
+
 printf "\nIntune-Zabbix-Bridge installed.\n"
-printf "Put ONE file named intune-zabbix-bridge.env in Downloads.\n"
-printf "It will be imported automatically and the collector will run.\n"
+printf "Copy the deployment file into the protected import inbox with:\n"
+printf "  sudo install -o root -g root -m 0600 intune-zabbix-bridge.env /etc/intune-zabbix-bridge/import/intune-zabbix-bridge.env\n"
+printf "The path unit will import it, remove the inbox copy and run the collector.\n"
 exit 0
