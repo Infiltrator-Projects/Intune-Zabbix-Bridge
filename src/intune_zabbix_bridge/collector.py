@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Microsoft Intune -> Zabbix reboot telemetry bridge.
 
-The bridge is deliberately read-only against Microsoft Graph. It reads the
-output of an existing Intune Remediation / deviceHealthScript that emits:
+The bridge is deliberately read-only against Microsoft Graph. It uses the
+Intune managed-Windows inventory as the authoritative fleet, then left-joins
+the output of an existing Intune Remediation / deviceHealthScript that emits:
 
     DEVICE=<name>;LASTBOOT=<ISO-8601>;UPTIME_HOURS=<number>
 
-It then publishes fleet-level metrics to a single Zabbix host using
-zabbix_sender. No connection to managed laptops is required.
+Devices expected in Intune but missing reboot telemetry remain visible as
+explicit "missing" rows instead of disappearing. The bridge publishes
+fleet-level metrics to a single Zabbix host using zabbix_sender. No connection
+to managed laptops is required.
 """
 
 from __future__ import annotations
@@ -116,6 +119,44 @@ class DeviceTelemetry:
         }
 
 
+@dataclass(frozen=True)
+class ManagedWindowsDevice:
+    computer_name: str
+    user: str
+    last_sync: datetime | None = None
+
+
+@dataclass(frozen=True)
+class FleetDevice:
+    computer_name: str
+    user: str
+    last_restart: datetime | None
+    telemetry_collected: datetime | None
+    uptime_days: float | None
+    telemetry_age_hours: float | None
+    telemetry_status: str
+
+    @property
+    def fresh(self) -> bool:
+        return self.telemetry_status == "fresh"
+
+    def as_json(self, local_tz: ZoneInfo) -> dict[str, Any]:
+        return {
+            "computer_name": self.computer_name,
+            "user": self.user,
+            "last_restart": self.last_restart.astimezone(local_tz).isoformat()
+                if self.last_restart is not None else "",
+            "telemetry_collected": self.telemetry_collected.astimezone(local_tz).isoformat()
+                if self.telemetry_collected is not None else "",
+            "uptime_days": round(self.uptime_days, 3)
+                if self.uptime_days is not None else None,
+            "telemetry_age_hours": round(self.telemetry_age_hours, 2)
+                if self.telemetry_age_hours is not None else None,
+            "fresh": self.fresh,
+            "telemetry_status": self.telemetry_status,
+        }
+
+
 def parse_datetime(value: str) -> datetime:
     value = value.strip()
     if value.endswith("Z"):
@@ -205,20 +246,62 @@ def graph_get(config: Config, token: str, url: str) -> dict[str, Any]:
     )
 
 
+def graph_get_all(config: Config, token: str, url: str) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    while url:
+        page = graph_get(config, token, url)
+        items.extend(page.get("value", []))
+        url = str(page.get("@odata.nextLink") or "")
+    return items
+
+
 def fetch_run_states(config: Config, token: str) -> list[dict[str, Any]]:
     script_id = urllib.parse.quote(config.telemetry_script_id, safe="")
     url = (
         f"{GRAPH_ROOT}/deviceManagement/deviceHealthScripts/{script_id}/"
         "deviceRunStates?$top=999&$expand=managedDevice"
     )
-    states: list[dict[str, Any]] = []
+    return graph_get_all(config, token, url)
 
-    while url:
-        page = graph_get(config, token, url)
-        states.extend(page.get("value", []))
-        url = page.get("@odata.nextLink", "")
 
-    return states
+def fetch_managed_windows_devices(config: Config, token: str) -> list[dict[str, Any]]:
+    url = (
+        f"{GRAPH_ROOT}/deviceManagement/managedDevices"
+        "?$top=999&$select=deviceName,userPrincipalName,operatingSystem,lastSyncDateTime"
+    )
+    return graph_get_all(config, token, url)
+
+
+def parse_managed_windows_devices(
+    devices: Iterable[dict[str, Any]],
+) -> list[ManagedWindowsDevice]:
+    newest_by_device: dict[str, ManagedWindowsDevice] = {}
+    for device in devices:
+        if str(device.get("operatingSystem") or "").casefold() != "windows":
+            continue
+        computer_name = str(device.get("deviceName") or "").strip()
+        if not computer_name:
+            continue
+        last_sync_raw = str(device.get("lastSyncDateTime") or "").strip()
+        last_sync: datetime | None = None
+        if last_sync_raw:
+            try:
+                last_sync = parse_datetime(last_sync_raw)
+            except (TypeError, ValueError):
+                LOG.warning("Ignoring malformed Intune last-sync time for %s", computer_name)
+        record = ManagedWindowsDevice(
+            computer_name=computer_name,
+            user=str(device.get("userPrincipalName") or "").strip(),
+            last_sync=last_sync,
+        )
+        key = computer_name.casefold()
+        existing = newest_by_device.get(key)
+        if existing is None or (
+            record.last_sync is not None
+            and (existing.last_sync is None or record.last_sync > existing.last_sync)
+        ):
+            newest_by_device[key] = record
+    return list(newest_by_device.values())
 
 
 def parse_run_states(
@@ -272,12 +355,45 @@ def parse_run_states(
     return list(newest_by_device.values())
 
 
+def merge_fleet_devices(
+    managed_devices: Iterable[ManagedWindowsDevice],
+    telemetry_records: Iterable[DeviceTelemetry],
+) -> list[FleetDevice]:
+    telemetry_by_device = {
+        record.computer_name.casefold(): record for record in telemetry_records
+    }
+    fleet: list[FleetDevice] = []
+    for managed in managed_devices:
+        telemetry = telemetry_by_device.get(managed.computer_name.casefold())
+        if telemetry is None:
+            fleet.append(FleetDevice(
+                computer_name=managed.computer_name,
+                user=managed.user,
+                last_restart=None,
+                telemetry_collected=None,
+                uptime_days=None,
+                telemetry_age_hours=None,
+                telemetry_status="missing",
+            ))
+            continue
+        fleet.append(FleetDevice(
+            computer_name=managed.computer_name,
+            user=telemetry.user or managed.user,
+            last_restart=telemetry.last_restart,
+            telemetry_collected=telemetry.telemetry_collected,
+            uptime_days=telemetry.uptime_days,
+            telemetry_age_hours=telemetry.telemetry_age_hours,
+            telemetry_status="fresh" if telemetry.fresh else "stale",
+        ))
+    return fleet
+
+
 def build_top_table(
-    records: Iterable[DeviceTelemetry], *, top_n: int, local_tz: ZoneInfo
+    records: Iterable[FleetDevice], *, top_n: int, local_tz: ZoneInfo
 ) -> str:
     fresh = sorted(
-        (record for record in records if record.fresh),
-        key=lambda record: record.uptime_days,
+        (record for record in records if record.fresh and record.uptime_days is not None),
+        key=lambda record: record.uptime_days or 0.0,
         reverse=True,
     )[:top_n]
 
@@ -299,38 +415,49 @@ def build_top_table(
 
 
 def build_metrics(
-    records: list[DeviceTelemetry], *, config: Config, now: datetime
+    records: list[FleetDevice], *, config: Config, now: datetime
 ) -> dict[str, str]:
     local_tz = ZoneInfo(config.timezone_name)
-    fresh = [record for record in records if record.fresh]
-    stale = [record for record in records if not record.fresh]
+    reporting = [r for r in records if r.telemetry_status != "missing"]
+    fresh = [r for r in records if r.telemetry_status == "fresh"]
+    stale = [r for r in records if r.telemetry_status == "stale"]
+    missing = [r for r in records if r.telemetry_status == "missing"]
     latest_collection = max(
-        (record.telemetry_collected for record in records), default=None
+        (r.telemetry_collected for r in reporting if r.telemetry_collected is not None),
+        default=None,
     )
-    max_uptime = max((record.uptime_days for record in fresh), default=0.0)
-
+    max_uptime = max(
+        (r.uptime_days for r in fresh if r.uptime_days is not None),
+        default=0.0,
+    )
     ranked_devices = sorted(
-        fresh, key=lambda record: record.uptime_days, reverse=True
+        records,
+        key=lambda r: (
+            r.uptime_days is not None,
+            r.uptime_days if r.uptime_days is not None else -1.0,
+        ),
+        reverse=True,
     )
-    serialised_devices = [
-        record.as_json(local_tz) for record in ranked_devices
-    ]
+    ranked_fresh = [r for r in ranked_devices if r.telemetry_status == "fresh"]
+    serialised_devices = [r.as_json(local_tz) for r in ranked_devices]
     summary = {
         "generated_at": now.astimezone(local_tz).isoformat(),
-        "reporting_devices": len(records),
+        "expected_devices": len(records),
+        "reporting_devices": len(reporting),
         "fresh_devices": len(fresh),
         "stale_devices": len(stale),
+        "missing_devices": len(missing),
         "max_telemetry_age_hours": config.max_telemetry_age_hours,
         "max_uptime_days": round(max_uptime, 3),
-        "over_7_days": sum(record.uptime_days >= 7 for record in fresh),
-        "over_14_days": sum(record.uptime_days >= 14 for record in fresh),
-        "over_30_days": sum(record.uptime_days >= 30 for record in fresh),
+        "over_7_days": sum((r.uptime_days or 0.0) >= 7 for r in fresh),
+        "over_14_days": sum((r.uptime_days or 0.0) >= 14 for r in fresh),
+        "over_30_days": sum((r.uptime_days or 0.0) >= 30 for r in fresh),
         "devices": serialised_devices,
-        "top": serialised_devices[: config.top_n],
+        "top": [r.as_json(local_tz) for r in ranked_fresh[: config.top_n]],
     }
 
     return {
-        "intune.windows.reporting.count": str(len(records)),
+        "intune.windows.reporting.count": str(len(reporting)),
         "intune.windows.fresh.count": str(len(fresh)),
         "intune.windows.stale.count": str(len(stale)),
         "intune.windows.max.uptime.days": f"{max_uptime:.3f}",
@@ -389,11 +516,14 @@ def collect(config: Config) -> tuple[list[DeviceTelemetry], dict[str, str]]:
     now = datetime.now(timezone.utc)
     token = get_access_token(config)
     raw_states = fetch_run_states(config, token)
-    records = parse_run_states(
+    raw_managed_devices = fetch_managed_windows_devices(config, token)
+    telemetry_records = parse_run_states(
         raw_states,
         now=now,
         max_age_hours=config.max_telemetry_age_hours,
     )
+    managed_devices = parse_managed_windows_devices(raw_managed_devices)
+    records = merge_fleet_devices(managed_devices, telemetry_records)
     metrics = build_metrics(records, config=config, now=now)
     return records, metrics
 
@@ -430,11 +560,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = Config.from_env()
         records, metrics = collect(config)
+        summary = json.loads(metrics["intune.windows.summary.json"])
         LOG.info(
-            "Parsed %d reporting devices (%s fresh, %s stale)",
-            len(records),
-            metrics["intune.windows.fresh.count"],
-            metrics["intune.windows.stale.count"],
+            "Fleet %d expected devices (%d reporting, %d fresh, %d stale, %d missing)",
+            summary["expected_devices"],
+            summary["reporting_devices"],
+            summary["fresh_devices"],
+            summary["stale_devices"],
+            summary["missing_devices"],
         )
         if args.dry_run:
             if args.json_output:

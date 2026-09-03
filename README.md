@@ -1,6 +1,6 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.7.0  
+**Release:** 0.7.2  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** private/internal only
 
@@ -19,5 +19,8 @@ Put that one file in the logged-in Linux user's **Downloads** folder. A systemd 
 
 The Zabbix widget self-provisions its host group, fleet host and trapper items.
 
-The fleet table searches all fresh devices by computer name or username. Every
-column heading is clickable; click the active heading again to reverse its sort.
+The fleet table uses Intune's managed Windows inventory as the authoritative
+population and left-joins reboot telemetry. Devices with stale or missing
+telemetry remain visible and searchable by computer name or username instead
+of silently disappearing. Every column heading is clickable; click the active
+heading again to reverse its sort.
