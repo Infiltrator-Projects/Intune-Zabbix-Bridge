@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.4 — 2026-09-03
+
+- Restored the actual purpose of Reboot Watch: identify whether each ring-covered Windows workstation has satisfied the required weekly restart.
+- Added weekly schedule evaluation against real `LastBootUpTime`, matching the deployed Sunday 03:00 catch-up policy and its first active occurrence on 06/09/2026.
+- Added explicit **MISSED**, **Current**, **Unknown**, and **Not active** reboot states and a Due / next timestamp.
+- Fresh telemetry plus exactly one ring is required before claiming a machine missed its restart; stale/missing telemetry and no/multiple ring states are Unknown instead of false positives.
+- Made reboot state the default table ranking and added fleet counters/Zabbix items for missed/current/unknown/not-active.
+- Added schedule settings to deployment configuration and regressions around the first Sunday, missed restart, successful restart, stale telemetry and broken ring state.
+- Supersedes 0.7.3, which fixed ring/telemetry visibility but still did not calculate whether a restart was actually due.
+
 ## 0.7.3 — 2026-09-03
 
 - Corrected the 0.7.2 model after re-checking the original update-ring audit and Reboot Watch purpose.

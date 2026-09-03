@@ -29,6 +29,13 @@ $summary = $parser->parse(json_encode([
     'fresh_devices' => 2,
     'stale_devices' => 1,
     'missing_devices' => 1,
+    'reboot_missed_devices' => 1,
+    'reboot_current_devices' => 1,
+    'reboot_unknown_devices' => 1,
+    'reboot_not_active_devices' => 1,
+    'weekly_restart_day' => 'sunday',
+    'weekly_restart_time' => '03:00',
+    'weekly_restart_policy_start' => '2026-09-06T03:00:00',
     'max_uptime_days' => 20.5,
     'over_7_days' => 2,
     'over_14_days' => 1,
@@ -51,6 +58,10 @@ if ($summary['expected_devices'] !== 4
         || $summary['one_ring_devices'] !== 3
         || $summary['no_ring_devices'] !== 1
         || $summary['multiple_ring_devices'] !== 0
+        || $summary['reboot_missed_devices'] !== 1
+        || $summary['reboot_current_devices'] !== 1
+        || $summary['reboot_unknown_devices'] !== 1
+        || $summary['reboot_not_active_devices'] !== 1
         || $summary['reporting_devices'] !== 3
         || $summary['stale_devices'] !== 1
         || $summary['missing_devices'] !== 1) {
@@ -68,6 +79,9 @@ $full_summary = $parser->parse(json_encode([
             'ring_state' => 'one',
             'ring_status' => 'compliant',
             'ring_last_reported' => '2026-09-02T02:50:00+00:00',
+            'reboot_state' => 'missed',
+            'reboot_priority' => 3,
+            'reboot_due' => '2026-09-05T17:00:00+00:00',
             'uptime_days' => 3
         ],
         [
@@ -77,6 +91,9 @@ $full_summary = $parser->parse(json_encode([
             'ring_count' => 0,
             'ring_state' => 'none',
             'ring_status' => 'not-reported',
+            'reboot_state' => 'unknown',
+            'reboot_priority' => 2,
+            'reboot_due' => '2026-09-05T17:00:00+00:00',
             'uptime_days' => 1
         ],
         [
@@ -86,6 +103,9 @@ $full_summary = $parser->parse(json_encode([
             'ring_count' => 2,
             'ring_state' => 'multiple',
             'ring_status' => 'multiple',
+            'reboot_state' => 'unknown',
+            'reboot_priority' => 2,
+            'reboot_due' => '2026-09-05T17:00:00+00:00',
             'uptime_days' => 2
         ],
         [
@@ -95,6 +115,9 @@ $full_summary = $parser->parse(json_encode([
             'ring_count' => 1,
             'ring_state' => 'one',
             'ring_status' => 'compliant',
+            'reboot_state' => 'unknown',
+            'reboot_priority' => 2,
+            'reboot_due' => '2026-09-05T17:00:00+00:00',
             'uptime_days' => null,
             'telemetry_age_hours' => null,
             'telemetry_status' => 'missing'
@@ -119,7 +142,11 @@ if (count($full_summary['top']) !== 2) {
     fail_fleet('Visible top list did not honour the row limit.');
 }
 if ($full_summary['devices'][0]['computer_name'] !== 'PC-3') {
-    fail_fleet('Full device list was not ranked by uptime.');
+    fail_fleet('Missed-reboot device was not ranked first.');
+}
+if ($full_summary['devices'][0]['reboot_state'] !== 'missed'
+        || $full_summary['devices'][0]['reboot_due'] === '') {
+    fail_fleet('Reboot requirement state was not preserved.');
 }
 
 fwrite(STDOUT, "FleetSummary tests passed.\n");

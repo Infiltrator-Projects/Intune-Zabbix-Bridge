@@ -2,36 +2,38 @@
 
 ## Normal operation
 
-The collector runs every 15 minutes. The widget uses normal Zabbix refresh scheduling and reads the newest fleet-summary history record.
+The collector runs every 15 minutes. The widget uses normal Zabbix refresh scheduling and reads the newest fleet summary.
 
-**Collector current** means summary generation is within the widget threshold. **Collector stale** means it is older. **Collector time unavailable/invalid** means freshness cannot be established.
+The fleet row population is the current Intune managed-Windows estate. Ring reporting, reboot telemetry and weekly restart compliance are separate attributes.
 
-The fleet row population is the current Intune managed-Windows estate. Ring reporting and reboot telemetry are independent attributes on those rows.
+## Reboot state semantics
 
-## Table semantics
+**MISSED** means there is exactly one reported update ring, reboot telemetry is fresh, and the actual Windows last boot is earlier than the most recent applicable weekly restart boundary.
 
-**Computer** is the current Intune managed-device name.
+**Current** means the last boot is at or after that boundary. The Due / next column shows the next weekly boundary.
 
-**Update ring** is the ring name reported through the Windows Update Ring `deviceStatuses` relationship. **Ring state** is One ring, No ring reported, or Multiple rings. For exactly one ring the raw Intune configuration status is displayed beside the state. **Ring reported** is that ring's last report time.
+**Unknown** means the weekly policy is active but Reboot Watch cannot safely decide because ring reporting is none/multiple or reboot telemetry is stale/missing.
 
-**Telemetry** is Fresh, Stale or Missing for the reboot-telemetry remediation. **Uptime** comes from Windows `LastBootUpTime` when reboot telemetry exists. **Last restart** is the actual Windows boot time. **Telemetry collected** is when that endpoint record was captured. **Age** is reboot-telemetry age at collector generation.
+**Not active** means the first configured weekly boundary has not happened yet. For the current deployment this is Sunday 06/09/2026 at 03:00 Australia/Melbourne.
 
-Search matches computer names, usernames and update-ring names without case sensitivity. Click any column heading to sort; click the active heading again to reverse direction. Uptime descending remains the initial view.
+The dashboard must not substitute "uptime >= 7 days" for this test. Uptime remains useful context only.
+
+## Ring and telemetry semantics
+
+**Update ring** is the ring name observed through Windows Update Ring `deviceStatuses`. **Ring state** is One ring, No ring reported, or Multiple rings.
+
+**Telemetry** is Fresh, Stale or Missing for `Windows - Reboot Telemetry`. **Last restart** comes from Windows `LastBootUpTime`.
+
+Search matches computer names, usernames and update-ring names. Default sorting puts MISSED first, then Unknown, then Not active, then Current.
 
 ## Fault isolation
 
-If the collector fails with an update-ring Graph error, verify `DeviceManagementConfiguration.Read.All` application permission and admin consent. Do not treat an inventory-only result as acceptable.
+If **MISSED** is non-zero, those machines have fresh evidence that they have not rebooted since the required weekly boundary.
 
-If **No ring reported** is non-zero, those Windows devices exist in Intune but no current update-ring device status was returned for them.
+If **Unknown** is non-zero, inspect ring/telemetry columns before drawing a reboot conclusion.
 
-If **Multiple rings** is non-zero, more than one update-ring device status was returned for those computers and they should be investigated rather than silently choosing one.
+If **No ring reported** or **Multiple rings** is non-zero, fix the update-ring coverage issue rather than silently selecting a ring.
 
-If **Missing telemetry** is non-zero, those computers can still have a valid update-ring status; the reboot-telemetry remediation simply has not supplied a usable record.
+If **Telemetry missing/stale** is non-zero, the machine remains visible but its weekly restart state cannot be proven after policy activation.
 
-If the summary item is missing, confirm `intune.windows.summary.json` exists in Latest data.
-
-If it has no history, verify collector configuration/service.
-
-If the collector is stale, check the systemd timer/service and Graph authentication.
-
-If the widget type is absent, scan/enable the module and refresh the browser.
+Graph permission failures should fail the collector rather than produce a misleading dashboard.

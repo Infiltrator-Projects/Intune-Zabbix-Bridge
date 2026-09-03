@@ -8,11 +8,15 @@ After installation:
 2. import `/usr/share/intune-zabbix-bridge/zabbix/template_intune_zabbix_bridge.yaml`;
 3. create/link **Microsoft Intune - Windows Fleet**;
 4. configure `/etc/intune-zabbix-bridge/bridge.env` with the Entra application and telemetry-script ID;
-5. test the collector with `intune-zabbix-bridge --dry-run --json`;
-6. verify that the JSON has sensible `one_ring_devices`, `no_ring_devices`, `multiple_ring_devices` and reboot-telemetry counts;
-7. enable `intune-zabbix-bridge.timer` when the dry run is correct.
+5. confirm the weekly restart schedule. The built-in defaults mirror the current St Augustine's policy:
+   `WEEKLY_RESTART_DAY=sunday`,
+   `WEEKLY_RESTART_TIME=03:00`,
+   `WEEKLY_RESTART_POLICY_START=2026-09-06T03:00:00`,
+   `TIMEZONE=Australia/Melbourne`;
+6. test through the systemd service so the protected environment file is loaded;
+7. enable/keep `intune-zabbix-bridge.timer` when the first collection is correct.
 
-The Entra application is read-only. It needs Microsoft Graph application permissions sufficient to read the current managed-device inventory, Windows Update Ring configuration/status, and device-health-script results. For current Graph permission naming this means:
+The Entra application is read-only and needs:
 
 - `DeviceManagementManagedDevices.Read.All`
 - `DeviceManagementConfiguration.Read.All`

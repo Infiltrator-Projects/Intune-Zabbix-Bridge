@@ -57,7 +57,7 @@ class WidgetIntuneRebootWatch extends CWidget {
     onInitialize() {
         this._irw_search = '';
         this._irw_sort = {
-            key: 'uptime',
+            key: 'reboot-priority',
             type: 'number',
             direction: 'desc'
         };
@@ -167,7 +167,7 @@ class WidgetIntuneRebootWatch extends CWidget {
                 empty.className = 'irw-filter-empty';
 
                 const cell = document.createElement('td');
-                cell.colSpan = 11;
+                cell.colSpan = 13;
                 cell.textContent = root.dataset.noSearchResults;
                 empty.appendChild(cell);
                 body.appendChild(empty);

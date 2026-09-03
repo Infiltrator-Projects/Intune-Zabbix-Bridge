@@ -2,66 +2,63 @@
 
 ## Purpose
 
-INTUNE — Reboot Watch is an operational view of Windows Update Ring reporting and actual Windows reboot telemetry. Policy reporting and endpoint telemetry are deliberately independent so the absence of one signal cannot make a computer disappear.
+INTUNE — Reboot Watch answers two separate questions for the managed Windows estate:
+
+1. has Intune reported exactly one Windows Update Ring for this machine?
+2. has the machine rebooted since the applicable required weekly restart?
+
+Neither policy reporting nor reboot telemetry is allowed to make a computer disappear.
 
 ## Data flow
 
 ```text
 Intune managed Windows inventory
         │
-        ├─────────────── authoritative estate ───────────────┐
+        ├──────────── estate ────────────────────────────────┐
         │                                                    │
-Windows Update Rings                                  Windows client
-deviceStatuses                                        Intune Management Extension
-        │                                                    │
-        │                                             Windows - Reboot Telemetry
+Windows Update Ring deviceStatuses                    Windows client
+        │                                              LastBootUpTime
         │                                                    │
         └──────────── Microsoft Graph ───────────────────────┘
                               │
                               ▼
                     Intune-Zabbix-Bridge
                               │
-                         zabbix_sender
-                              ▼
-                 Microsoft Intune - Windows Fleet
+              weekly restart schedule evaluator
                               │
-                 intune.windows.summary.json
+                              ▼
+       MISSED / Current / Unknown / Not active
+                              │
+                         zabbix_sender
                               ▼
                     INTUNE — Reboot Watch
 ```
 
-## Responsibilities
+## Ring state
 
-The current managed-Windows inventory defines the estate. Every current Windows device remains present even when update-ring status or reboot telemetry is absent.
+Every current managed Windows device remains visible and is classified as:
 
-The collector reads every `windowsUpdateForBusinessConfiguration` and its supported `deviceStatuses` relationship. A device is classified as:
+- **one** — exactly one update ring reports it;
+- **none** — no update-ring `deviceStatus` is currently reported;
+- **multiple** — more than one update ring reports it.
 
-- **one** — exactly one update ring has reported that device;
-- **none** — no update-ring device status is currently reported;
-- **multiple** — more than one update ring reports the device.
+Ring name, raw Intune configuration status and last-report time are retained.
 
-For an exactly-one device, the ring name, raw Intune configuration status and last reported time are retained. This is an observed reporting signal; it is not inferred from the reboot telemetry.
+## Weekly reboot state
 
-The reboot-telemetry remediation remains a separate signal. Its newest record per device provides actual Windows last-boot time and endpoint telemetry freshness. Missing/stale telemetry never removes a row.
+The current deployment mirrors the endpoint catch-up helper: Sunday at 03:00 in `Australia/Melbourne`, first active occurrence 06/09/2026 03:00. These values are overrideable through the deployment environment file.
 
-The summary therefore contains the complete Windows estate plus ring and reboot states. The legacy bounded `top` list remains fresh-reboot-telemetry-only.
+For each device:
 
-`FleetSummary.php` parses/normalises summary JSON without Zabbix dependencies. `TelemetryState.php` classifies collector freshness. `WidgetForm.php` persists only source item, row count and stale threshold. `WidgetView.php` is the only frontend component that calls Zabbix APIs. Browser JavaScript filters/sorts only the data already supplied by Zabbix and owns no network transport or competing refresh timer.
+- before the first active weekly boundary: **Not active**;
+- after activation, if ring count is not exactly one or reboot telemetry is stale/missing: **Unknown**;
+- with one ring and fresh telemetry, if `LastBootUpTime >= applicable weekly boundary`: **Current**;
+- with one ring and fresh telemetry, if `LastBootUpTime < applicable weekly boundary`: **MISSED**.
 
-## Source-item resolution
-
-1. explicitly configured accessible text item;
-2. canonical key `intune.windows.summary.json` on `Microsoft Intune - Windows Fleet`;
-3. first accessible exact-key text item.
-
-No direct SQL is used.
-
-## Time semantics
-
-The collector emits timezone-aware ISO-8601 values. The frontend converts display times using the active Zabbix/PHP timezone. Collector freshness compares instants in UTC.
+This duplicates the observation rule of the client catch-up helper without issuing any restart itself.
 
 ## Failure model
 
-The collector fails closed if it cannot read Windows Update Rings; it does not silently fall back to an inventory-only view.
+Graph/read failures fail the collector rather than manufacturing a result. Missing or contradictory per-device signals remain explicit row states.
 
-At fleet level, no-ring, multiple-ring, stale-telemetry and missing-telemetry states are explicit. The widget also distinguishes source-not-found, never-populated, malformed-summary, collector-current, collector-stale and collector-time-unknown states.
+Browser JavaScript only filters/sorts supplied Zabbix data and performs no network access.

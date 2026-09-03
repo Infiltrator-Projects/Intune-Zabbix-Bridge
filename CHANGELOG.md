@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.4 - 2026-09-03
+
+- Reconnected Reboot Watch to the weekly restart requirement instead of merely displaying ring and uptime telemetry.
+- Compares fresh real Windows last-boot time with the applicable Sunday 03:00 restart boundary, beginning 06/09/2026 for the current deployment.
+- Adds MISSED/Current/Unknown/Not active states, due/next time, and matching Zabbix counters.
+- Avoids false missed-reboot claims when ring status or reboot telemetry is missing/stale.
+- Supersedes 0.7.3 before deployment.
+
 ## 0.7.3 - 2026-09-03
 
 - Reworked Reboot Watch around three independent signals: managed Windows inventory, Windows Update Ring device status, and reboot telemetry.
