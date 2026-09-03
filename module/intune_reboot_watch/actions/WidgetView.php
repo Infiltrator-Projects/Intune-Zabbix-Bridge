@@ -310,6 +310,30 @@ final class WidgetView extends CControllerDashboardWidgetView {
                 'value_type' => ITEM_VALUE_TYPE_UINT64
             ],
             [
+                'name' => 'Intune: Windows missed weekly restart',
+                'key_' => 'intune.windows.reboot.missed.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows current for weekly restart',
+                'key_' => 'intune.windows.reboot.current.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows weekly restart state unknown',
+                'key_' => 'intune.windows.reboot.unknown.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows weekly restart policy not active',
+                'key_' => 'intune.windows.reboot.notactive.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
                 'name' => 'Intune: Maximum Windows uptime',
                 'key_' => 'intune.windows.max.uptime.days',
                 'type' => ITEM_TYPE_TRAPPER,
@@ -379,6 +403,12 @@ final class WidgetView extends CControllerDashboardWidgetView {
                 $ring_state = 'none';
             }
             $ring_status = trim((string) ($row['ring_status'] ?? ''));
+            $reboot_state = (string) ($row['reboot_state'] ?? 'unknown');
+            if (!in_array($reboot_state, ['missed', 'current', 'unknown', 'not-active'], true)) {
+                $reboot_state = 'unknown';
+            }
+            $reboot_due = (string) ($row['reboot_due'] ?? '');
+            $reboot_priority = max(0, (int) ($row['reboot_priority'] ?? 0));
 
             $result[] = [
                 'rank' => $index + 1,
@@ -395,6 +425,16 @@ final class WidgetView extends CControllerDashboardWidgetView {
                 'ring_status' => $ring_status !== '' ? $ring_status : '—',
                 'ring_last_reported' => $this->formatIsoTime($ring_last_reported),
                 'ring_last_reported_sort' => $this->isoTimestamp($ring_last_reported),
+                'reboot_state' => $reboot_state,
+                'reboot_label' => match ($reboot_state) {
+                    'missed' => _('MISSED'),
+                    'current' => _('Current'),
+                    'not-active' => _('Not active'),
+                    default => _('Unknown')
+                },
+                'reboot_due' => $this->formatIsoTime($reboot_due),
+                'reboot_due_sort' => $this->isoTimestamp($reboot_due),
+                'reboot_priority' => $reboot_priority,
                 'uptime_days' => $uptime,
                 'uptime_display' => $uptime === null ? '—' : number_format($uptime, 1).' d',
                 'last_restart' => $this->formatIsoTime($last_restart),
