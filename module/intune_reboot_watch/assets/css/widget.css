@@ -269,7 +269,24 @@
 .irw-ring-status.is-none,
 .irw-ring-status.is-multiple { color: var(--irw-red); border-color: rgba(241,109,120,.48); }
 
+.irw-reboot-status {
+    display: inline-block;
+    min-width: 66px;
+    padding: 3px 7px;
+    border: 1px solid var(--irw-border);
+    border-radius: 999px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.irw-reboot-status.is-current { color: var(--irw-green); }
+.irw-reboot-status.is-not-active { color: var(--irw-muted); }
+.irw-reboot-status.is-unknown { color: var(--irw-amber); border-color: rgba(239,196,92,.45); }
+.irw-reboot-status.is-missed { color: var(--irw-red); border-color: rgba(241,109,120,.6); }
+
 .irw-data-row.is-missing td { background: rgba(241,109,120,.055); }
+.irw-data-row.is-reboot-missed td { background: rgba(241,109,120,.08); }
 .irw-data-row.is-ring-none td,
 .irw-data-row.is-ring-multiple td { box-shadow: inset 3px 0 0 rgba(241,109,120,.75); }
 
