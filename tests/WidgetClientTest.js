@@ -39,7 +39,13 @@ if (!table.matches({computer: 'LAB-PC-17', user: 'student@example.com'}, 'pc-17'
 if (!table.matches({computer: 'LAB-PC-17', user: 'Student.Name@example.com'}, 'student.name')) {
     throw new Error('Username search is not case-insensitive.');
 }
-if (table.matches({computer: 'LAB-PC-17', user: 'student@example.com'}, 'teacher')) {
+if (!table.matches(
+    {computer: 'LAB-PC-17', user: 'student@example.com', ring: 'Update policy Students ending in Even numbers'},
+    'even numbers'
+)) {
+    throw new Error('Update-ring search failed.');
+}
+if (table.matches({computer: 'LAB-PC-17', user: 'student@example.com', ring: 'Ring A'}, 'teacher')) {
     throw new Error('Unrelated search unexpectedly matched.');
 }
 if (table.compareValues('2', '10', 'number', 'asc') >= 0) {
