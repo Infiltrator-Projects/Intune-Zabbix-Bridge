@@ -27,9 +27,13 @@ final class FleetSummary {
 
         return [
             'generated_at' => trim((string) ($decoded['generated_at'] ?? '')),
+            'expected_devices' => self::nonNegativeInt(
+                $decoded['expected_devices'] ?? $decoded['reporting_devices'] ?? 0
+            ),
             'reporting_devices' => self::nonNegativeInt($decoded['reporting_devices'] ?? 0),
             'fresh_devices' => self::nonNegativeInt($decoded['fresh_devices'] ?? 0),
             'stale_devices' => self::nonNegativeInt($decoded['stale_devices'] ?? 0),
+            'missing_devices' => self::nonNegativeInt($decoded['missing_devices'] ?? 0),
             'max_telemetry_age_hours' => self::nonNegativeFloat(
                 $decoded['max_telemetry_age_hours'] ?? 0
             ),
@@ -60,24 +64,34 @@ final class FleetSummary {
                 continue;
             }
 
+            $status = strtolower(trim((string) ($candidate['telemetry_status'] ?? '')));
+            if (!in_array($status, ['fresh', 'stale', 'missing'], true)) {
+                $status = (bool) ($candidate['fresh'] ?? false) ? 'fresh' : 'stale';
+            }
+            $uptime = array_key_exists('uptime_days', $candidate) && is_numeric($candidate['uptime_days'])
+                ? self::nonNegativeFloat($candidate['uptime_days']) : null;
+            $telemetry_age = array_key_exists('telemetry_age_hours', $candidate) && is_numeric($candidate['telemetry_age_hours'])
+                ? self::nonNegativeFloat($candidate['telemetry_age_hours']) : null;
             $rows[] = [
                 'computer_name' => $computer,
                 'user' => trim((string) ($candidate['user'] ?? '')),
                 'last_restart' => trim((string) ($candidate['last_restart'] ?? '')),
                 'telemetry_collected' => trim((string) ($candidate['telemetry_collected'] ?? '')),
-                'uptime_days' => self::nonNegativeFloat($candidate['uptime_days'] ?? 0),
-                'telemetry_age_hours' => self::nonNegativeFloat(
-                    $candidate['telemetry_age_hours'] ?? 0
-                ),
-                'fresh' => (bool) ($candidate['fresh'] ?? false)
+                'uptime_days' => $uptime,
+                'telemetry_age_hours' => $telemetry_age,
+                'fresh' => $status === 'fresh',
+                'telemetry_status' => $status
             ];
         }
 
-        usort(
-            $rows,
-            static fn(array $left, array $right): int =>
-                $right['uptime_days'] <=> $left['uptime_days']
-        );
+        usort($rows, static function(array $left, array $right): int {
+            $left_missing = $left['uptime_days'] === null;
+            $right_missing = $right['uptime_days'] === null;
+            if ($left_missing !== $right_missing) {
+                return $left_missing ? 1 : -1;
+            }
+            return ($right['uptime_days'] ?? 0.0) <=> ($left['uptime_days'] ?? 0.0);
+        });
 
         return $rows;
     }
