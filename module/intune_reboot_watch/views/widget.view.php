@@ -121,8 +121,8 @@ $stats = (new CDiv([
 $search = (new CInput('search', null))
     ->addClass('irw-search')
     ->setAttribute('data-irw-search', '1')
-    ->setAttribute('placeholder', _('Search computer or username'))
-    ->setAttribute('aria-label', _('Search by computer name or username'))
+    ->setAttribute('placeholder', _('Search computer, username or update ring'))
+    ->setAttribute('aria-label', _('Search by computer name, username or update ring'))
     ->setAttribute('autocomplete', 'off');
 
 $shown_initially = min($row_limit, count($data['rows']));
@@ -182,6 +182,7 @@ foreach ($data['rows'] as $row) {
             ->addClass('is-ring-'.$row['ring_state'])
             ->setAttribute('data-computer-name', (string) $row['computer_name'])
             ->setAttribute('data-user', (string) $row['user'])
+            ->setAttribute('data-ring-name', (string) $row['ring_name'])
             ->setAttribute('data-sort-rank', (string) $row['rank'])
             ->setAttribute('data-sort-computer', (string) $row['computer_name'])
             ->setAttribute('data-sort-user', (string) $row['user'])
@@ -220,7 +221,7 @@ $footer = (new CDiv([
 $contents = (new CDiv([$health, $stats, $toolbar, $table, $footer]))
     ->addClass('irw')
     ->setAttribute('data-row-limit', (string) $row_limit)
-    ->setAttribute('data-no-search-results', _('No computers or usernames match the search.'));
+    ->setAttribute('data-no-search-results', _('No computers, usernames or update rings match the search.'));
 
 (new CWidgetView($data))
     ->addItem($contents)
