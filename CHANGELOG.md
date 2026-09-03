@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.5 — 2026-09-04
+
+- Replaced hostname as the fleet join key with immutable Intune `managedDevice.id`; duplicate computer names now remain distinct devices.
+- Reboot telemetry is accepted only when the expanded run-state record supplies `managedDevice.id`.
+- Legacy Windows Update Ring `deviceStatuses` are attached only when name/UPN maps uniquely to one current managed device; ambiguous reports are left unresolved instead of guessed.
+- Refuses to publish a zero-device Windows estate after a successful Graph call.
+- Publishes the summary JSON last, only after every companion Zabbix metric succeeds, so the dashboard generation does not advance on a partial sender failure.
+- Restricted every packaged Zabbix trapper item to `127.0.0.1,::1` by default.
+- Removed dashboard-time Zabbix provisioning; Reboot Watch rendering is now read-only.
+- Replaced the all-users Downloads configuration watcher with a root-only `/etc/intune-zabbix-bridge/import/` inbox and validates source ownership/mode before importing secrets.
+- Fault rows remain visible beyond the normal row limit and through search filtering.
+- Collector timestamps more than five minutes in the future are Unknown instead of Fresh.
+- Release publication now requires an explicit `Release ` commit or manual dispatch instead of publishing every push to `main`.
+- Expanded regression coverage for immutable identity, ambiguous ring status, zero-fleet handling, generation publishing, importer security, trapper allow-lists and packaged hardened collector selection.
+
 ## 0.7.4 - 2026-09-03
 
 - Reconnected Reboot Watch to the weekly restart requirement instead of merely displaying ring and uptime telemetry.
