@@ -165,7 +165,7 @@ class WidgetIntuneRebootWatch extends CWidget {
                 empty.className = 'irw-filter-empty';
 
                 const cell = document.createElement('td');
-                cell.colSpan = 7;
+                cell.colSpan = 8;
                 cell.textContent = root.dataset.noSearchResults;
                 empty.appendChild(cell);
                 body.appendChild(empty);
