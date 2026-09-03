@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.2 - 2026-09-03
+
+- Made the managed Windows inventory authoritative for Reboot Watch and left-joined reboot telemetry onto it.
+- Missing or stale telemetry devices now stay visible instead of silently dropping out of the fleet.
+- Added Expected/Missing counters and an explicit telemetry-status column.
+
 ## 0.7.1 - 2026-09-03
 
 - Rebuilt and requalified the current bridge on GitHub-hosted CI as part of the coordinated project release refresh.
