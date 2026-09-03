@@ -15,6 +15,8 @@ $state = new TelemetryState();
 $now = new DateTimeImmutable('2026-09-02T03:30:00+00:00');
 
 assert_state('current', $state->evaluate('2026-09-02T03:15:00+00:00', $now, 30)['status'], 'fresh');
+assert_state('small clock skew', $state->evaluate('2026-09-02T03:33:00+00:00', $now, 30)['status'], 'fresh');
+assert_state('future clock', $state->evaluate('2026-09-02T03:40:00+00:00', $now, 30)['status'], 'unknown');
 assert_state('stale', $state->evaluate('2026-09-02T02:59:00+00:00', $now, 30)['status'], 'stale');
 assert_state('missing', $state->evaluate('', $now, 30)['status'], 'unknown');
 assert_state('invalid', $state->evaluate('not-a-time', $now, 30)['status'], 'unknown');
