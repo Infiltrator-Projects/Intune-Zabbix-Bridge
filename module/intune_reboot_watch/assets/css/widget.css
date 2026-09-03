@@ -63,7 +63,7 @@
 
 .irw-stats {
     display: grid;
-    grid-template-columns: repeat(7, minmax(84px, 1fr));
+    grid-template-columns: repeat(9, minmax(72px, 1fr));
     gap: 6px;
     flex: 0 0 auto;
     padding: 9px;
@@ -233,9 +233,27 @@
 }
 
 .irw-uptime.is-ok { color: var(--irw-green); }
-.irw-uptime.is-warn { color: var(--irw-amber); border-color: rgba(239,196,92,.45); }
+.irw-uptime.is-warn,
+.irw-uptime.is-stale { color: var(--irw-amber); border-color: rgba(239,196,92,.45); }
 .irw-uptime.is-high,
-.irw-uptime.is-critical { color: var(--irw-red); border-color: rgba(241,109,120,.48); }
+.irw-uptime.is-critical,
+.irw-uptime.is-missing { color: var(--irw-red); border-color: rgba(241,109,120,.48); }
+
+.irw-telemetry-status {
+    display: inline-block;
+    min-width: 58px;
+    padding: 3px 7px;
+    border: 1px solid var(--irw-border);
+    border-radius: 999px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.irw-telemetry-status.is-fresh { color: var(--irw-green); }
+.irw-telemetry-status.is-stale { color: var(--irw-amber); border-color: rgba(239,196,92,.45); }
+.irw-telemetry-status.is-missing { color: var(--irw-red); border-color: rgba(241,109,120,.48); }
+.irw-data-row.is-missing td { background: rgba(241,109,120,.055); }
 
 .irw-footer {
     display: flex;
@@ -271,9 +289,9 @@
     line-height: 1.45;
 }
 
-@media (max-width: 1050px) {
+@media (max-width: 1200px) {
     .irw-stats {
-        grid-template-columns: repeat(4, minmax(84px, 1fr));
+        grid-template-columns: repeat(5, minmax(78px, 1fr));
     }
 
     .irw-health-source {
