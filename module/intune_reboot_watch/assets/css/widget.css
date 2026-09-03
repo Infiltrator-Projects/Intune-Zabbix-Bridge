@@ -63,7 +63,7 @@
 
 .irw-stats {
     display: grid;
-    grid-template-columns: repeat(9, minmax(72px, 1fr));
+    grid-template-columns: repeat(12, minmax(68px, 1fr));
     gap: 6px;
     flex: 0 0 auto;
     padding: 9px;
@@ -253,7 +253,25 @@
 .irw-telemetry-status.is-fresh { color: var(--irw-green); }
 .irw-telemetry-status.is-stale { color: var(--irw-amber); border-color: rgba(239,196,92,.45); }
 .irw-telemetry-status.is-missing { color: var(--irw-red); border-color: rgba(241,109,120,.48); }
+
+.irw-ring-status {
+    display: inline-block;
+    min-width: 64px;
+    padding: 3px 7px;
+    border: 1px solid var(--irw-border);
+    border-radius: 999px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.irw-ring-status.is-one { color: var(--irw-green); }
+.irw-ring-status.is-none,
+.irw-ring-status.is-multiple { color: var(--irw-red); border-color: rgba(241,109,120,.48); }
+
 .irw-data-row.is-missing td { background: rgba(241,109,120,.055); }
+.irw-data-row.is-ring-none td,
+.irw-data-row.is-ring-multiple td { box-shadow: inset 3px 0 0 rgba(241,109,120,.75); }
 
 .irw-footer {
     display: flex;
@@ -289,9 +307,9 @@
     line-height: 1.45;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
     .irw-stats {
-        grid-template-columns: repeat(5, minmax(78px, 1fr));
+        grid-template-columns: repeat(6, minmax(72px, 1fr));
     }
 
     .irw-health-source {

@@ -1,6 +1,6 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.7.2  
+**Release:** 0.7.3  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** private/internal only
 
@@ -19,8 +19,6 @@ Put that one file in the logged-in Linux user's **Downloads** folder. A systemd 
 
 The Zabbix widget self-provisions its host group, fleet host and trapper items.
 
-The fleet table uses Intune's managed Windows inventory as the authoritative
-population and left-joins reboot telemetry. Devices with stale or missing
-telemetry remain visible and searchable by computer name or username instead
-of silently disappearing. Every column heading is clickable; click the active
-heading again to reverse its sort.
+Reboot Watch keeps the current managed-Windows inventory visible, reads Windows Update Ring device reporting independently, then left-joins actual reboot telemetry. A computer therefore cannot disappear merely because its reboot telemetry is missing. It can be shown as **One ring**, **No ring reported**, or **Multiple rings**, independently of **Fresh / Stale / Missing** reboot telemetry.
+
+Search covers computer name, username and update-ring name. Every column heading is sortable.

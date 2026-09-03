@@ -2,16 +2,16 @@
 
 Static checks cover manifest identity/version, PHP, JavaScript, shell and Python syntax.
 
-`FleetSummaryTest.php` covers malformed JSON, row normalisation, sorting and bounds.
+`FleetSummaryTest.php` covers malformed JSON, row normalisation, ring fields, missing telemetry, sorting and bounds.
 
-`TelemetryStateTest.php` covers current/stale/unknown states with timezone-aware instants.
+`TelemetryStateTest.php` covers current/stale/unknown collector states with timezone-aware instants.
 
-`WidgetViewSourceContractTest.php` catches helper/constant drift that syntax checking cannot.
+`WidgetViewSourceContractTest.php` catches helper/constant and required-trapper-key drift that syntax checking cannot.
 
-`WidgetClientTest.js` proves browser code does not introduce direct network transport or a competing timer.
+`WidgetClientTest.js` proves browser code does not introduce direct network transport or a competing timer and covers computer, username and update-ring search.
 
-Python unittests cover timestamp parsing, newest-record de-duplication and longest-uptime ranking.
+Python unittests cover timestamp parsing, managed-device de-duplication, update-ring report de-duplication, the exact "ring reported but reboot telemetry missing" case, explicit no-ring/multiple-ring states and separation of ring counters from reboot-telemetry counters.
 
 Packaging tests build both the Debian package and portable module installer, verify metadata and assert the module is installed at the Zabbix module path.
 
-Acceptance: install/update, scan/enable module, confirm widget appears, verify automatic/explicit source selection, stale-state behaviour, descending top-ten ranking and timezone-correct timestamps.
+Acceptance: install/update, run `intune-zabbix-bridge --dry-run --json`, confirm Windows/ring/telemetry counts are credible, scan/enable the module, verify ring and reboot fault states, search/sort, stale-state behaviour and timezone-correct timestamps.

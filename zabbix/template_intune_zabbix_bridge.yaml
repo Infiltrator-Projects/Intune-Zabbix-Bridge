@@ -35,6 +35,38 @@ zabbix_export:
           history: 90d
           trends: 365d
           value_type: UNSIGNED
+        - uuid: 9073e08d12d64888a062e5a054982ec9
+          name: 'Intune: Windows reporting an update ring'
+          type: TRAP
+          key: intune.windows.ring.reporting.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: e69e4242153a4d23abb2c954694d9eba
+          name: 'Intune: Windows reporting exactly one update ring'
+          type: TRAP
+          key: intune.windows.ring.one.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: 1a2a0b4a68c040c3a8a4f3379e953e46
+          name: 'Intune: Windows with no update ring reported'
+          type: TRAP
+          key: intune.windows.ring.none.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: fc7e6f681ac940b982a2b8f4255f18dc
+          name: 'Intune: Windows reporting multiple update rings'
+          type: TRAP
+          key: intune.windows.ring.multiple.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
         - uuid: 43fc6ee601814746a6b1d4053b1d8406
           name: 'Intune: Maximum Windows uptime'
           type: TRAP

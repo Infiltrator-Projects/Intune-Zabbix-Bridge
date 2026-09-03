@@ -9,12 +9,13 @@ const IntuneRebootWatchTable = Object.freeze({
         return String(value ?? '').trim().toLocaleLowerCase();
     },
 
-    matches({computer = '', user = ''}, query) {
+    matches({computer = '', user = '', ring = ''}, query) {
         const needle = this.normaliseSearch(query);
 
         return needle === ''
             || this.normaliseSearch(computer).includes(needle)
-            || this.normaliseSearch(user).includes(needle);
+            || this.normaliseSearch(user).includes(needle)
+            || this.normaliseSearch(ring).includes(needle);
     },
 
     compareValues(left, right, type, direction) {
@@ -119,7 +120,8 @@ class WidgetIntuneRebootWatch extends CWidget {
         const matches = rows.filter(row => IntuneRebootWatchTable.matches(
             {
                 computer: row.dataset.computerName,
-                user: row.dataset.user
+                user: row.dataset.user,
+                ring: row.dataset.ringName
             },
             query
         ));
@@ -165,7 +167,7 @@ class WidgetIntuneRebootWatch extends CWidget {
                 empty.className = 'irw-filter-empty';
 
                 const cell = document.createElement('td');
-                cell.colSpan = 8;
+                cell.colSpan = 11;
                 cell.textContent = root.dataset.noSearchResults;
                 empty.appendChild(cell);
                 body.appendChild(empty);

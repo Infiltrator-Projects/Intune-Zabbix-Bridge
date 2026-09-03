@@ -21,6 +21,10 @@ catch (InvalidArgumentException) {
 $summary = $parser->parse(json_encode([
     'generated_at' => '2026-09-02T03:00:00+00:00',
     'expected_devices' => 4,
+    'ring_reporting_devices' => 3,
+    'one_ring_devices' => 3,
+    'no_ring_devices' => 1,
+    'multiple_ring_devices' => 0,
     'reporting_devices' => 3,
     'fresh_devices' => 2,
     'stale_devices' => 1,
@@ -43,6 +47,10 @@ if (count($summary['top']) !== 2) {
     fail_fleet('Rows were not bounded correctly.');
 }
 if ($summary['expected_devices'] !== 4
+        || $summary['ring_reporting_devices'] !== 3
+        || $summary['one_ring_devices'] !== 3
+        || $summary['no_ring_devices'] !== 1
+        || $summary['multiple_ring_devices'] !== 0
         || $summary['reporting_devices'] !== 3
         || $summary['stale_devices'] !== 1
         || $summary['missing_devices'] !== 1) {
@@ -52,12 +60,45 @@ if ($summary['expected_devices'] !== 4
 $full_summary = $parser->parse(json_encode([
     'generated_at' => '2026-09-02T03:00:00+00:00',
     'devices' => [
-        ['computer_name' => 'PC-3', 'user' => 'c@example.com', 'uptime_days' => 3],
-        ['computer_name' => 'PC-1', 'user' => 'a@example.com', 'uptime_days' => 1],
-        ['computer_name' => 'PC-2', 'user' => 'b@example.com', 'uptime_days' => 2],
-        ['computer_name' => 'PC-MISSING', 'user' => 'missing@example.com',
-         'uptime_days' => null, 'telemetry_age_hours' => null,
-         'telemetry_status' => 'missing']
+        [
+            'computer_name' => 'PC-3',
+            'user' => 'c@example.com',
+            'ring_name' => 'Ring B',
+            'ring_count' => 1,
+            'ring_state' => 'one',
+            'ring_status' => 'compliant',
+            'ring_last_reported' => '2026-09-02T02:50:00+00:00',
+            'uptime_days' => 3
+        ],
+        [
+            'computer_name' => 'PC-1',
+            'user' => 'a@example.com',
+            'ring_name' => '',
+            'ring_count' => 0,
+            'ring_state' => 'none',
+            'ring_status' => 'not-reported',
+            'uptime_days' => 1
+        ],
+        [
+            'computer_name' => 'PC-2',
+            'user' => 'b@example.com',
+            'ring_name' => 'Ring A; Ring B',
+            'ring_count' => 2,
+            'ring_state' => 'multiple',
+            'ring_status' => 'multiple',
+            'uptime_days' => 2
+        ],
+        [
+            'computer_name' => 'PC-MISSING',
+            'user' => 'missing@example.com',
+            'ring_name' => 'Ring A',
+            'ring_count' => 1,
+            'ring_state' => 'one',
+            'ring_status' => 'compliant',
+            'uptime_days' => null,
+            'telemetry_age_hours' => null,
+            'telemetry_status' => 'missing'
+        ]
     ],
     'top' => [
         ['computer_name' => 'PC-3', 'user' => 'c@example.com', 'uptime_days' => 3]
@@ -69,8 +110,10 @@ if (count($full_summary['devices']) !== 4) {
 }
 if ($full_summary['devices'][3]['computer_name'] !== 'PC-MISSING'
         || $full_summary['devices'][3]['telemetry_status'] !== 'missing'
+        || $full_summary['devices'][3]['ring_name'] !== 'Ring A'
+        || $full_summary['devices'][3]['ring_state'] !== 'one'
         || $full_summary['devices'][3]['uptime_days'] !== null) {
-    fail_fleet('Missing telemetry device was not preserved explicitly.');
+    fail_fleet('Ring-reported device with missing telemetry was not preserved.');
 }
 if (count($full_summary['top']) !== 2) {
     fail_fleet('Visible top list did not honour the row limit.');

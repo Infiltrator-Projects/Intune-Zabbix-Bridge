@@ -13,7 +13,11 @@ foreach ([
     'ensureFleetDataModel',
     'API::HostGroup()->create',
     'API::Host()->create',
-    'API::Item()->create'
+    'API::Item()->create',
+    'intune.windows.ring.reporting.count',
+    'intune.windows.ring.one.count',
+    'intune.windows.ring.none.count',
+    'intune.windows.ring.multiple.count'
 ] as $symbol) {
     if (strpos($source, $symbol) === false) {
         fwrite(STDERR, "FAIL: WidgetView no longer references {$symbol}.\n");

@@ -4,9 +4,9 @@
   "type": "widget",
   "name": "INTUNE — Reboot Watch",
   "namespace": "IntuneRebootWatch",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "author": "Infiltrator Projects",
-  "description": "Searchable, sortable Zabbix 7.0 dashboard widget for Microsoft Intune reboot telemetry and fleet freshness.",
+  "description": "Searchable, sortable Zabbix 7.0 dashboard widget for Microsoft Intune update-ring and reboot telemetry.",
   "actions": {
     "widget.intune_reboot_watch.view": {
       "class": "WidgetView"
