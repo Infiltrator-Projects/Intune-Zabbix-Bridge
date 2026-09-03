@@ -34,7 +34,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, time as dt_time, timedelta, timezone
 from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
@@ -65,6 +65,9 @@ class Config:
     top_n: int
     http_timeout: float
     http_retries: int
+    weekly_restart_day: str = "sunday"
+    weekly_restart_time: str = "03:00"
+    weekly_restart_policy_start: str = "2026-09-06T03:00:00"
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -100,6 +103,16 @@ class Config:
             top_n=max(1, int(os.getenv("TOP_N", "10"))),
             http_timeout=float(os.getenv("HTTP_TIMEOUT_SECONDS", "20")),
             http_retries=max(0, int(os.getenv("HTTP_RETRIES", "4"))),
+            weekly_restart_day=os.getenv(
+                "WEEKLY_RESTART_DAY", "sunday"
+            ).strip().lower(),
+            weekly_restart_time=os.getenv(
+                "WEEKLY_RESTART_TIME", "03:00"
+            ).strip(),
+            weekly_restart_policy_start=os.getenv(
+                "WEEKLY_RESTART_POLICY_START",
+                "2026-09-06T03:00:00",
+            ).strip(),
         )
 
 
@@ -138,6 +151,13 @@ class RingReport:
 
 
 @dataclass(frozen=True)
+class RebootRequirement:
+    state: str
+    due_at: datetime | None
+    priority: int
+
+
+@dataclass(frozen=True)
 class FleetDevice:
     computer_name: str
     user: str
@@ -156,7 +176,11 @@ class FleetDevice:
     def fresh(self) -> bool:
         return self.telemetry_status == "fresh"
 
-    def as_json(self, local_tz: ZoneInfo) -> dict[str, Any]:
+    def as_json(
+        self,
+        local_tz: ZoneInfo,
+        reboot: RebootRequirement,
+    ) -> dict[str, Any]:
         return {
             "computer_name": self.computer_name,
             "user": self.user,
@@ -191,7 +215,25 @@ class FleetDevice:
             ),
             "fresh": self.fresh,
             "telemetry_status": self.telemetry_status,
+            "reboot_state": reboot.state,
+            "reboot_priority": reboot.priority,
+            "reboot_due": (
+                reboot.due_at.astimezone(local_tz).isoformat()
+                if reboot.due_at is not None
+                else ""
+            ),
         }
+
+
+WEEKDAYS = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+}
 
 
 def parse_datetime(value: str) -> datetime:
@@ -202,6 +244,150 @@ def parse_datetime(value: str) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _restart_schedule(config: Config) -> tuple[ZoneInfo, int, dt_time, datetime]:
+    local_tz = ZoneInfo(config.timezone_name)
+
+    day_name = config.weekly_restart_day.strip().lower()
+    if day_name not in WEEKDAYS:
+        raise ValueError(
+            "WEEKLY_RESTART_DAY must be a weekday name; "
+            f"got {config.weekly_restart_day!r}"
+        )
+
+    try:
+        hour_text, minute_text = config.weekly_restart_time.split(":", 1)
+        schedule_time = dt_time(
+            hour=int(hour_text),
+            minute=int(minute_text),
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "WEEKLY_RESTART_TIME must be HH:MM; "
+            f"got {config.weekly_restart_time!r}"
+        ) from exc
+
+    try:
+        policy_start = datetime.fromisoformat(
+            config.weekly_restart_policy_start
+        )
+    except ValueError as exc:
+        raise ValueError(
+            "WEEKLY_RESTART_POLICY_START must be ISO-8601 local time; "
+            f"got {config.weekly_restart_policy_start!r}"
+        ) from exc
+
+    if policy_start.tzinfo is None:
+        policy_start = policy_start.replace(tzinfo=local_tz)
+    else:
+        policy_start = policy_start.astimezone(local_tz)
+
+    return local_tz, WEEKDAYS[day_name], schedule_time, policy_start
+
+
+def _weekly_occurrence_on_or_before(
+    reference: datetime,
+    *,
+    weekday: int,
+    at: dt_time,
+    local_tz: ZoneInfo,
+) -> datetime:
+    local_reference = reference.astimezone(local_tz)
+    days_back = (local_reference.weekday() - weekday) % 7
+    target_date = (local_reference - timedelta(days=days_back)).date()
+    candidate = datetime.combine(target_date, at, tzinfo=local_tz)
+
+    if candidate > local_reference:
+        target_date -= timedelta(days=7)
+        candidate = datetime.combine(target_date, at, tzinfo=local_tz)
+
+    return candidate
+
+
+def _weekly_occurrence_after(
+    occurrence: datetime,
+    *,
+    at: dt_time,
+    local_tz: ZoneInfo,
+) -> datetime:
+    next_date = occurrence.astimezone(local_tz).date() + timedelta(days=7)
+    return datetime.combine(next_date, at, tzinfo=local_tz)
+
+
+def evaluate_reboot_requirement(
+    record: FleetDevice,
+    *,
+    config: Config,
+    now: datetime,
+) -> RebootRequirement:
+    local_tz, weekday, schedule_time, policy_start = _restart_schedule(config)
+    local_now = now.astimezone(local_tz)
+
+    first_due = _weekly_occurrence_on_or_before(
+        policy_start,
+        weekday=weekday,
+        at=schedule_time,
+        local_tz=local_tz,
+    )
+    if first_due < policy_start:
+        first_due = _weekly_occurrence_after(
+            first_due,
+            at=schedule_time,
+            local_tz=local_tz,
+        )
+
+    if local_now < first_due:
+        return RebootRequirement(
+            state="not-active",
+            due_at=first_due.astimezone(timezone.utc),
+            priority=1,
+        )
+
+    applicable = _weekly_occurrence_on_or_before(
+        local_now,
+        weekday=weekday,
+        at=schedule_time,
+        local_tz=local_tz,
+    )
+    if applicable < first_due:
+        return RebootRequirement(
+            state="not-active",
+            due_at=first_due.astimezone(timezone.utc),
+            priority=1,
+        )
+
+    if record.ring_count != 1 or record.telemetry_status != "fresh":
+        return RebootRequirement(
+            state="unknown",
+            due_at=applicable.astimezone(timezone.utc),
+            priority=2,
+        )
+
+    if record.last_restart is None:
+        return RebootRequirement(
+            state="unknown",
+            due_at=applicable.astimezone(timezone.utc),
+            priority=2,
+        )
+
+    if record.last_restart >= applicable.astimezone(timezone.utc):
+        next_due = _weekly_occurrence_after(
+            applicable,
+            at=schedule_time,
+            local_tz=local_tz,
+        )
+        return RebootRequirement(
+            state="current",
+            due_at=next_due.astimezone(timezone.utc),
+            priority=0,
+        )
+
+    return RebootRequirement(
+        state="missed",
+        due_at=applicable.astimezone(timezone.utc),
+        priority=3,
+    )
 
 
 def _request_json(
@@ -701,10 +887,35 @@ def build_metrics(
         default=0.0,
     )
 
+    reboot_by_device = {
+        record.computer_name.casefold(): evaluate_reboot_requirement(
+            record,
+            config=config,
+            now=now,
+        )
+        for record in records
+    }
+    missed_reboot = [
+        record for record in records
+        if reboot_by_device[record.computer_name.casefold()].state == "missed"
+    ]
+    current_reboot = [
+        record for record in records
+        if reboot_by_device[record.computer_name.casefold()].state == "current"
+    ]
+    unknown_reboot = [
+        record for record in records
+        if reboot_by_device[record.computer_name.casefold()].state == "unknown"
+    ]
+    not_active_reboot = [
+        record for record in records
+        if reboot_by_device[record.computer_name.casefold()].state == "not-active"
+    ]
+
     ranked_devices = sorted(
         records,
         key=lambda record: (
-            record.uptime_days is not None,
+            reboot_by_device[record.computer_name.casefold()].priority,
             record.uptime_days
             if record.uptime_days is not None
             else -1.0,
@@ -717,7 +928,10 @@ def build_metrics(
         if record.telemetry_status == "fresh"
     ]
     serialised_devices = [
-        record.as_json(local_tz)
+        record.as_json(
+            local_tz,
+            reboot_by_device[record.computer_name.casefold()],
+        )
         for record in ranked_devices
     ]
 
@@ -732,6 +946,13 @@ def build_metrics(
         "fresh_devices": len(fresh),
         "stale_devices": len(stale),
         "missing_devices": len(missing),
+        "reboot_missed_devices": len(missed_reboot),
+        "reboot_current_devices": len(current_reboot),
+        "reboot_unknown_devices": len(unknown_reboot),
+        "reboot_not_active_devices": len(not_active_reboot),
+        "weekly_restart_day": config.weekly_restart_day,
+        "weekly_restart_time": config.weekly_restart_time,
+        "weekly_restart_policy_start": config.weekly_restart_policy_start,
         "max_telemetry_age_hours": config.max_telemetry_age_hours,
         "max_uptime_days": round(max_uptime, 3),
         "over_7_days": sum(
@@ -748,7 +969,10 @@ def build_metrics(
         ),
         "devices": serialised_devices,
         "top": [
-            record.as_json(local_tz)
+            record.as_json(
+                local_tz,
+                reboot_by_device[record.computer_name.casefold()],
+            )
             for record in ranked_fresh[: config.top_n]
         ],
     }
@@ -761,6 +985,10 @@ def build_metrics(
         "intune.windows.ring.one.count": str(len(one_ring)),
         "intune.windows.ring.none.count": str(len(no_ring)),
         "intune.windows.ring.multiple.count": str(len(multiple_ring)),
+        "intune.windows.reboot.missed.count": str(len(missed_reboot)),
+        "intune.windows.reboot.current.count": str(len(current_reboot)),
+        "intune.windows.reboot.unknown.count": str(len(unknown_reboot)),
+        "intune.windows.reboot.notactive.count": str(len(not_active_reboot)),
         "intune.windows.max.uptime.days": f"{max_uptime:.3f}",
         "intune.windows.uptime.over7.count": str(
             sum(
@@ -926,7 +1154,8 @@ def main(argv: list[str] | None = None) -> int:
             (
                 "Fleet %d Windows devices "
                 "(%d one ring, %d no ring, %d multiple rings; "
-                "%d telemetry reporting, %d fresh, %d stale, %d missing)"
+                "%d telemetry reporting, %d fresh, %d stale, %d missing; "
+                "%d missed reboot, %d current, %d unknown, %d not active)"
             ),
             summary["expected_devices"],
             summary["one_ring_devices"],
@@ -936,6 +1165,10 @@ def main(argv: list[str] | None = None) -> int:
             summary["fresh_devices"],
             summary["stale_devices"],
             summary["missing_devices"],
+            summary["reboot_missed_devices"],
+            summary["reboot_current_devices"],
+            summary["reboot_unknown_devices"],
+            summary["reboot_not_active_devices"],
         )
 
         if args.dry_run:
