@@ -1,16 +1,48 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import glob, os, shutil, subprocess, sys, tempfile
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 DEST = Path("/etc/intune-zabbix-bridge/bridge.env")
-PATTERNS = ("/home/*/Downloads/intune-zabbix-bridge.env", "/root/Downloads/intune-zabbix-bridge.env")
-REQUIRED = ("AZURE_TENANT_ID","AZURE_CLIENT_ID","AZURE_CLIENT_SECRET","INTUNE_TELEMETRY_SCRIPT_ID")
-OPTIONAL = {"ZABBIX_SERVER","ZABBIX_PORT","ZABBIX_HOST","ZABBIX_SENDER","TIMEZONE","MAX_TELEMETRY_AGE_HOURS","TOP_N","HTTP_TIMEOUT_SECONDS","HTTP_RETRIES","LOG_LEVEL","WEEKLY_RESTART_DAY","WEEKLY_RESTART_TIME","WEEKLY_RESTART_POLICY_START"}
+SOURCE = Path("/etc/intune-zabbix-bridge/import/intune-zabbix-bridge.env")
+REQUIRED = (
+    "AZURE_TENANT_ID",
+    "AZURE_CLIENT_ID",
+    "AZURE_CLIENT_SECRET",
+    "INTUNE_TELEMETRY_SCRIPT_ID",
+)
+OPTIONAL = {
+    "ZABBIX_SERVER",
+    "ZABBIX_PORT",
+    "ZABBIX_HOST",
+    "ZABBIX_SENDER",
+    "ZABBIX_ALLOWED_HOSTS",
+    "TIMEZONE",
+    "MAX_TELEMETRY_AGE_HOURS",
+    "TOP_N",
+    "HTTP_TIMEOUT_SECONDS",
+    "HTTP_RETRIES",
+    "LOG_LEVEL",
+    "WEEKLY_RESTART_DAY",
+    "WEEKLY_RESTART_TIME",
+    "WEEKLY_RESTART_POLICY_START",
+}
 ALLOWED = set(REQUIRED) | OPTIONAL
 
+
 def parse_file(path: Path) -> dict[str, str]:
-    values = {}
+    stat = path.stat()
+    if stat.st_uid != 0:
+        raise PermissionError("configuration file must be owned by root")
+    if stat.st_mode & 0o022:
+        raise PermissionError("configuration file must not be group/world writable")
+
+    values: dict[str, str] = {}
     for raw in path.read_text(encoding="utf-8-sig").splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -24,16 +56,12 @@ def parse_file(path: Path) -> dict[str, str]:
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
             value = value[1:-1]
         values[key] = value
-    missing = [k for k in REQUIRED if not values.get(k, "").strip()]
+
+    missing = [key for key in REQUIRED if not values.get(key, "").strip()]
     if missing:
         raise ValueError("Missing required setting(s): " + ", ".join(missing))
     return values
 
-def newest_candidate() -> Path | None:
-    matches = []
-    for pattern in PATTERNS:
-        matches.extend(Path(p) for p in glob.glob(pattern))
-    return max(matches, key=lambda p: p.stat().st_mtime) if matches else None
 
 def write_canonical(values: dict[str, str]) -> None:
     DEST.parent.mkdir(parents=True, exist_ok=True)
@@ -54,44 +82,71 @@ def write_canonical(values: dict[str, str]) -> None:
     finally:
         tmp.unlink(missing_ok=True)
 
-def run(*args: str):
-    return subprocess.run(list(args), text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+
+def run(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        list(args),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
 
 def main() -> int:
-    source = newest_candidate()
-    if source is None:
-        print("No intune-zabbix-bridge.env file is waiting in Downloads.")
+    if not SOURCE.exists():
+        print(f"No protected configuration is waiting at {SOURCE}.")
         return 0
-    source_stat = source.stat()
-    error_file = source.parent / "intune-zabbix-bridge.ERROR.txt"
+
+    error_file = SOURCE.parent / "intune-zabbix-bridge.ERROR.txt"
+    invalid = SOURCE.parent / "intune-zabbix-bridge.INVALID.env"
+
     try:
-        values = parse_file(source)
+        values = parse_file(SOURCE)
         write_canonical(values)
     except Exception as exc:
-        invalid = source.parent / "intune-zabbix-bridge.INVALID.env"
-        source.replace(invalid)
+        try:
+            SOURCE.replace(invalid)
+            os.chown(invalid, 0, 0)
+            os.chmod(invalid, 0o600)
+        except OSError:
+            pass
         error_file.write_text(f"Configuration import failed: {exc}\n", encoding="utf-8")
-        os.chown(invalid, source_stat.st_uid, source_stat.st_gid)
-        os.chown(error_file, source_stat.st_uid, source_stat.st_gid)
+        os.chown(error_file, 0, 0)
+        os.chmod(error_file, 0o600)
         print(f"Configuration import failed: {exc}", file=sys.stderr)
         return 1
-    source.unlink(missing_ok=True)
+
+    SOURCE.unlink(missing_ok=True)
     error_file.unlink(missing_ok=True)
+    invalid.unlink(missing_ok=True)
+
     run("systemctl", "daemon-reload")
     timer = run("systemctl", "enable", "--now", "intune-zabbix-bridge.timer")
     if timer.returncode != 0:
         print(timer.stdout.strip(), file=sys.stderr)
         return timer.returncode
+
     first = run("systemctl", "restart", "intune-zabbix-bridge.service")
     if first.returncode != 0:
-        logs = run("journalctl", "-u", "intune-zabbix-bridge.service", "-n", "60", "--no-pager")
+        logs = run(
+            "journalctl",
+            "-u",
+            "intune-zabbix-bridge.service",
+            "-n",
+            "60",
+            "--no-pager",
+        )
         message = "Configuration imported, but the first collector run failed.\n\n" + logs.stdout
         error_file.write_text(message, encoding="utf-8")
-        os.chown(error_file, source_stat.st_uid, source_stat.st_gid)
+        os.chown(error_file, 0, 0)
+        os.chmod(error_file, 0o600)
         print(message, file=sys.stderr)
         return first.returncode
+
     print("Configuration imported and first collection completed successfully.")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
