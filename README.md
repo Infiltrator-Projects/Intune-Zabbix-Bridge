@@ -1,12 +1,12 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.7.3  
+**Release:** 0.7.4  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** private/internal only
 
-There is one universal Debian package for every installation. It contains no tenant credentials and no site-specific Intune script ID.
+There is one Debian package for deployment. It contains no tenant credentials and no site-specific Intune script ID.
 
-Each deployment needs exactly one separate file named `intune-zabbix-bridge.env` with these four values:
+Each deployment needs `intune-zabbix-bridge.env` with:
 
 ```text
 AZURE_TENANT_ID=
@@ -15,10 +15,17 @@ AZURE_CLIENT_SECRET=
 INTUNE_TELEMETRY_SCRIPT_ID=
 ```
 
-Put that one file in the logged-in Linux user's **Downloads** folder. A systemd path watcher imports it automatically to `/etc/intune-zabbix-bridge/bridge.env`, removes the Downloads copy, enables the collector timer and immediately performs the first collection.
+Optional weekly restart settings are supported. Current St Augustine's defaults are:
 
-The Zabbix widget self-provisions its host group, fleet host and trapper items.
+```text
+WEEKLY_RESTART_DAY=sunday
+WEEKLY_RESTART_TIME=03:00
+WEEKLY_RESTART_POLICY_START=2026-09-06T03:00:00
+TIMEZONE=Australia/Melbourne
+```
 
-Reboot Watch keeps the current managed-Windows inventory visible, reads Windows Update Ring device reporting independently, then left-joins actual reboot telemetry. A computer therefore cannot disappear merely because its reboot telemetry is missing. It can be shown as **One ring**, **No ring reported**, or **Multiple rings**, independently of **Fresh / Stale / Missing** reboot telemetry.
+Reboot Watch combines the current managed-Windows estate, observed Windows Update Ring device status, and actual reboot telemetry. It then compares each trustworthy `LastBootUpTime` with the applicable weekly restart boundary.
 
-Search covers computer name, username and update-ring name. Every column heading is sortable.
+The dashboard therefore distinguishes **MISSED**, **Current**, **Unknown**, and **Not active** weekly restart states. Missing ring/telemetry signals remain visible rather than removing the machine.
+
+The Zabbix widget self-provisions its host group, fleet host and trapper items. Search covers computer name, username and update-ring name, and all displayed columns are sortable.
