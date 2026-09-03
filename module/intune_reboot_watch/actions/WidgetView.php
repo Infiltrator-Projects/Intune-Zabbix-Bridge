@@ -336,7 +336,17 @@ final class WidgetView extends CControllerDashboardWidgetView {
         $result = [];
 
         foreach ($rows as $index => $row) {
-            $uptime = max(0.0, (float) ($row['uptime_days'] ?? 0));
+            $status = (string) ($row['telemetry_status'] ?? 'stale');
+            if (!in_array($status, ['fresh', 'stale', 'missing'], true)) {
+                $status = 'stale';
+            }
+
+            $uptime = is_numeric($row['uptime_days'] ?? null)
+                ? max(0.0, (float) $row['uptime_days'])
+                : null;
+            $telemetry_age = is_numeric($row['telemetry_age_hours'] ?? null)
+                ? max(0.0, (float) $row['telemetry_age_hours'])
+                : null;
             $last_restart = (string) ($row['last_restart'] ?? '');
             $telemetry_collected = (string) ($row['telemetry_collected'] ?? '');
 
@@ -345,17 +355,28 @@ final class WidgetView extends CControllerDashboardWidgetView {
                 'computer_name' => (string) ($row['computer_name'] ?? ''),
                 'user' => (string) ($row['user'] ?? ''),
                 'uptime_days' => $uptime,
+                'uptime_display' => $uptime === null ? '—' : number_format($uptime, 1).' d',
                 'last_restart' => $this->formatIsoTime($last_restart),
                 'last_restart_sort' => $this->isoTimestamp($last_restart),
                 'telemetry_collected' => $this->formatIsoTime($telemetry_collected),
                 'telemetry_collected_sort' => $this->isoTimestamp($telemetry_collected),
-                'telemetry_age_hours' => max(
-                    0.0,
-                    (float) ($row['telemetry_age_hours'] ?? 0)
-                ),
-                'severity' => $uptime >= 30
-                    ? 'critical'
-                    : ($uptime >= 14 ? 'high' : ($uptime >= 7 ? 'warn' : 'ok'))
+                'telemetry_age_hours' => $telemetry_age,
+                'telemetry_age_display' => $telemetry_age === null
+                    ? '—'
+                    : number_format($telemetry_age, 1).' h',
+                'telemetry_status' => $status,
+                'telemetry_label' => match ($status) {
+                    'fresh' => _('Fresh'),
+                    'stale' => _('Stale'),
+                    default => _('Missing')
+                },
+                'severity' => $status === 'missing'
+                    ? 'missing'
+                    : ($status === 'stale'
+                        ? 'stale'
+                        : ($uptime >= 30
+                            ? 'critical'
+                            : ($uptime >= 14 ? 'high' : ($uptime >= 7 ? 'warn' : 'ok'))))
             ];
         }
 
