@@ -42,6 +42,23 @@ final class FleetSummary {
             'fresh_devices' => self::nonNegativeInt($decoded['fresh_devices'] ?? 0),
             'stale_devices' => self::nonNegativeInt($decoded['stale_devices'] ?? 0),
             'missing_devices' => self::nonNegativeInt($decoded['missing_devices'] ?? 0),
+            'reboot_missed_devices' => self::nonNegativeInt(
+                $decoded['reboot_missed_devices'] ?? 0
+            ),
+            'reboot_current_devices' => self::nonNegativeInt(
+                $decoded['reboot_current_devices'] ?? 0
+            ),
+            'reboot_unknown_devices' => self::nonNegativeInt(
+                $decoded['reboot_unknown_devices'] ?? 0
+            ),
+            'reboot_not_active_devices' => self::nonNegativeInt(
+                $decoded['reboot_not_active_devices'] ?? 0
+            ),
+            'weekly_restart_day' => trim((string) ($decoded['weekly_restart_day'] ?? '')),
+            'weekly_restart_time' => trim((string) ($decoded['weekly_restart_time'] ?? '')),
+            'weekly_restart_policy_start' => trim(
+                (string) ($decoded['weekly_restart_policy_start'] ?? '')
+            ),
             'max_telemetry_age_hours' => self::nonNegativeFloat(
                 $decoded['max_telemetry_age_hours'] ?? 0
             ),
@@ -85,6 +102,11 @@ final class FleetSummary {
                 $ring_state = 'none';
             }
 
+            $reboot_state = strtolower(trim((string) ($candidate['reboot_state'] ?? 'unknown')));
+            if (!in_array($reboot_state, ['missed', 'current', 'unknown', 'not-active'], true)) {
+                $reboot_state = 'unknown';
+            }
+
             $rows[] = [
                 'computer_name' => $computer,
                 'user' => trim((string) ($candidate['user'] ?? '')),
@@ -100,16 +122,27 @@ final class FleetSummary {
                 'uptime_days' => $uptime,
                 'telemetry_age_hours' => $telemetry_age,
                 'fresh' => $status === 'fresh',
-                'telemetry_status' => $status
+                'telemetry_status' => $status,
+                'reboot_state' => $reboot_state,
+                'reboot_priority' => self::nonNegativeInt(
+                    $candidate['reboot_priority'] ?? 0
+                ),
+                'reboot_due' => trim((string) ($candidate['reboot_due'] ?? ''))
             ];
         }
 
         usort($rows, static function(array $left, array $right): int {
+            $priority = $right['reboot_priority'] <=> $left['reboot_priority'];
+            if ($priority !== 0) {
+                return $priority;
+            }
+
             $left_missing = $left['uptime_days'] === null;
             $right_missing = $right['uptime_days'] === null;
             if ($left_missing !== $right_missing) {
                 return $left_missing ? 1 : -1;
             }
+
             return ($right['uptime_days'] ?? 0.0) <=> ($left['uptime_days'] ?? 0.0);
         });
 
