@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 """Microsoft Intune -> Zabbix reboot telemetry bridge.
 
-The bridge is deliberately read-only against Microsoft Graph. It uses the
-Intune managed-Windows inventory as the authoritative fleet, then left-joins
-the output of an existing Intune Remediation / deviceHealthScript that emits:
+The bridge is deliberately read-only against Microsoft Graph.
 
-    DEVICE=<name>;LASTBOOT=<ISO-8601>;UPTIME_HOURS=<number>
+Reboot Watch keeps three separate planes of truth:
 
-Devices expected in Intune but missing reboot telemetry remain visible as
-explicit "missing" rows instead of disappearing. The bridge publishes
-fleet-level metrics to a single Zabbix host using zabbix_sender. No connection
-to managed laptops is required.
+1. the current Intune managed-Windows inventory defines the estate that must
+   never silently disappear;
+2. Windows Update Ring deviceStatuses prove which update-ring configuration(s)
+   each device has actually reported to Intune;
+3. the existing Intune Remediation / deviceHealthScript reports actual Windows
+   boot telemetry in this format:
+
+       DEVICE=<name>;LASTBOOT=<ISO-8601>;UPTIME_HOURS=<number>
+
+A current Windows device with no ring status, multiple ring statuses, stale
+telemetry or no telemetry remains visible as an explicit fault state. The
+bridge publishes fleet-level metrics to a single Zabbix host using
+zabbix_sender. No connection to managed laptops is required.
 """
 
 from __future__ import annotations
@@ -33,7 +40,8 @@ from zoneinfo import ZoneInfo
 
 LOG = logging.getLogger("intune-zabbix-bridge")
 
-GRAPH_ROOT = "https://graph.microsoft.com/beta"
+GRAPH_BETA_ROOT = "https://graph.microsoft.com/beta"
+GRAPH_V1_ROOT = "https://graph.microsoft.com/v1.0"
 TOKEN_SCOPE = "https://graph.microsoft.com/.default"
 TELEMETRY_RE = re.compile(
     r"(?:^|;)DEVICE=(?P<device>[^;]+);LASTBOOT=(?P<lastboot>[^;]+);"
@@ -105,19 +113,6 @@ class DeviceTelemetry:
     telemetry_age_hours: float
     fresh: bool
 
-    def as_json(self, local_tz: ZoneInfo) -> dict[str, Any]:
-        return {
-            "computer_name": self.computer_name,
-            "user": self.user,
-            "last_restart": self.last_restart.astimezone(local_tz).isoformat(),
-            "telemetry_collected": self.telemetry_collected.astimezone(
-                local_tz
-            ).isoformat(),
-            "uptime_days": round(self.uptime_days, 3),
-            "telemetry_age_hours": round(self.telemetry_age_hours, 2),
-            "fresh": self.fresh,
-        }
-
 
 @dataclass(frozen=True)
 class ManagedWindowsDevice:
@@ -127,9 +122,30 @@ class ManagedWindowsDevice:
 
 
 @dataclass(frozen=True)
+class UpdateRing:
+    ring_id: str
+    display_name: str
+
+
+@dataclass(frozen=True)
+class RingReport:
+    computer_name: str
+    user: str
+    ring_id: str
+    ring_name: str
+    status: str
+    last_reported: datetime | None
+
+
+@dataclass(frozen=True)
 class FleetDevice:
     computer_name: str
     user: str
+    ring_names: tuple[str, ...]
+    ring_count: int
+    ring_state: str
+    ring_status: str
+    ring_last_reported: datetime | None
     last_restart: datetime | None
     telemetry_collected: datetime | None
     uptime_days: float | None
@@ -144,14 +160,35 @@ class FleetDevice:
         return {
             "computer_name": self.computer_name,
             "user": self.user,
-            "last_restart": self.last_restart.astimezone(local_tz).isoformat()
-                if self.last_restart is not None else "",
-            "telemetry_collected": self.telemetry_collected.astimezone(local_tz).isoformat()
-                if self.telemetry_collected is not None else "",
-            "uptime_days": round(self.uptime_days, 3)
-                if self.uptime_days is not None else None,
-            "telemetry_age_hours": round(self.telemetry_age_hours, 2)
-                if self.telemetry_age_hours is not None else None,
+            "ring_name": "; ".join(self.ring_names),
+            "ring_count": self.ring_count,
+            "ring_state": self.ring_state,
+            "ring_status": self.ring_status,
+            "ring_last_reported": (
+                self.ring_last_reported.astimezone(local_tz).isoformat()
+                if self.ring_last_reported is not None
+                else ""
+            ),
+            "last_restart": (
+                self.last_restart.astimezone(local_tz).isoformat()
+                if self.last_restart is not None
+                else ""
+            ),
+            "telemetry_collected": (
+                self.telemetry_collected.astimezone(local_tz).isoformat()
+                if self.telemetry_collected is not None
+                else ""
+            ),
+            "uptime_days": (
+                round(self.uptime_days, 3)
+                if self.uptime_days is not None
+                else None
+            ),
+            "telemetry_age_hours": (
+                round(self.telemetry_age_hours, 2)
+                if self.telemetry_age_hours is not None
+                else None
+            ),
             "fresh": self.fresh,
             "telemetry_status": self.telemetry_status,
         }
@@ -258,50 +295,153 @@ def graph_get_all(config: Config, token: str, url: str) -> list[dict[str, Any]]:
 def fetch_run_states(config: Config, token: str) -> list[dict[str, Any]]:
     script_id = urllib.parse.quote(config.telemetry_script_id, safe="")
     url = (
-        f"{GRAPH_ROOT}/deviceManagement/deviceHealthScripts/{script_id}/"
+        f"{GRAPH_BETA_ROOT}/deviceManagement/deviceHealthScripts/{script_id}/"
         "deviceRunStates?$top=999&$expand=managedDevice"
     )
     return graph_get_all(config, token, url)
 
 
-def fetch_managed_windows_devices(config: Config, token: str) -> list[dict[str, Any]]:
+def fetch_managed_windows_devices(
+    config: Config, token: str
+) -> list[dict[str, Any]]:
     url = (
-        f"{GRAPH_ROOT}/deviceManagement/managedDevices"
+        f"{GRAPH_V1_ROOT}/deviceManagement/managedDevices"
         "?$top=999&$select=deviceName,userPrincipalName,operatingSystem,lastSyncDateTime"
     )
     return graph_get_all(config, token, url)
+
+
+def fetch_update_rings(config: Config, token: str) -> list[UpdateRing]:
+    url = f"{GRAPH_V1_ROOT}/deviceManagement/deviceConfigurations?$top=999"
+    configs = graph_get_all(config, token, url)
+    rings = [
+        UpdateRing(
+            ring_id=str(item.get("id") or "").strip(),
+            display_name=str(item.get("displayName") or "").strip(),
+        )
+        for item in configs
+        if str(item.get("@odata.type") or "").casefold()
+        == "#microsoft.graph.windowsupdateforbusinessconfiguration"
+        and str(item.get("id") or "").strip()
+        and str(item.get("displayName") or "").strip()
+    ]
+    if not rings:
+        raise RuntimeError(
+            "Microsoft Graph returned zero Windows Update Rings; "
+            "Reboot Watch will not publish a misleading fleet."
+        )
+    return rings
+
+
+def fetch_ring_device_statuses(
+    config: Config,
+    token: str,
+    rings: Iterable[UpdateRing],
+) -> list[dict[str, Any]]:
+    statuses: list[dict[str, Any]] = []
+    for ring in rings:
+        ring_id = urllib.parse.quote(ring.ring_id, safe="")
+        url = (
+            f"{GRAPH_V1_ROOT}/deviceManagement/deviceConfigurations/{ring_id}/"
+            "deviceStatuses?$top=999"
+        )
+        for item in graph_get_all(config, token, url):
+            item = dict(item)
+            item["_ring_id"] = ring.ring_id
+            item["_ring_name"] = ring.display_name
+            statuses.append(item)
+    return statuses
 
 
 def parse_managed_windows_devices(
     devices: Iterable[dict[str, Any]],
 ) -> list[ManagedWindowsDevice]:
     newest_by_device: dict[str, ManagedWindowsDevice] = {}
+
     for device in devices:
         if str(device.get("operatingSystem") or "").casefold() != "windows":
             continue
+
         computer_name = str(device.get("deviceName") or "").strip()
         if not computer_name:
             continue
+
         last_sync_raw = str(device.get("lastSyncDateTime") or "").strip()
         last_sync: datetime | None = None
         if last_sync_raw:
             try:
                 last_sync = parse_datetime(last_sync_raw)
             except (TypeError, ValueError):
-                LOG.warning("Ignoring malformed Intune last-sync time for %s", computer_name)
+                LOG.warning(
+                    "Ignoring malformed Intune last-sync time for %s",
+                    computer_name,
+                )
+
         record = ManagedWindowsDevice(
             computer_name=computer_name,
             user=str(device.get("userPrincipalName") or "").strip(),
             last_sync=last_sync,
         )
+
         key = computer_name.casefold()
         existing = newest_by_device.get(key)
         if existing is None or (
             record.last_sync is not None
-            and (existing.last_sync is None or record.last_sync > existing.last_sync)
+            and (
+                existing.last_sync is None
+                or record.last_sync > existing.last_sync
+            )
         ):
             newest_by_device[key] = record
+
     return list(newest_by_device.values())
+
+
+def parse_ring_reports(
+    statuses: Iterable[dict[str, Any]],
+) -> list[RingReport]:
+    newest_by_device_ring: dict[tuple[str, str], RingReport] = {}
+
+    for item in statuses:
+        computer_name = str(item.get("deviceDisplayName") or "").strip()
+        ring_id = str(item.get("_ring_id") or "").strip()
+        ring_name = str(item.get("_ring_name") or "").strip()
+        if not computer_name or not ring_id or not ring_name:
+            continue
+
+        last_reported_raw = str(item.get("lastReportedDateTime") or "").strip()
+        last_reported: datetime | None = None
+        if last_reported_raw:
+            try:
+                last_reported = parse_datetime(last_reported_raw)
+            except (TypeError, ValueError):
+                LOG.warning(
+                    "Ignoring malformed update-ring report time for %s / %s",
+                    computer_name,
+                    ring_name,
+                )
+
+        record = RingReport(
+            computer_name=computer_name,
+            user=str(item.get("userPrincipalName") or "").strip(),
+            ring_id=ring_id,
+            ring_name=ring_name,
+            status=str(item.get("status") or "unknown").strip() or "unknown",
+            last_reported=last_reported,
+        )
+
+        key = (computer_name.casefold(), ring_id.casefold())
+        existing = newest_by_device_ring.get(key)
+        if existing is None or (
+            record.last_reported is not None
+            and (
+                existing.last_reported is None
+                or record.last_reported > existing.last_reported
+            )
+        ):
+            newest_by_device_ring[key] = record
+
+    return list(newest_by_device_ring.values())
 
 
 def parse_run_states(
@@ -336,8 +476,14 @@ def parse_run_states(
             LOG.warning("Skipping malformed telemetry for %s", computer_name)
             continue
 
-        uptime_days = max(0.0, (now - last_restart).total_seconds() / 86400.0)
-        age_hours = max(0.0, (now - collected).total_seconds() / 3600.0)
+        uptime_days = max(
+            0.0,
+            (now - last_restart).total_seconds() / 86400.0,
+        )
+        age_hours = max(
+            0.0,
+            (now - collected).total_seconds() / 3600.0,
+        )
         record = DeviceTelemetry(
             computer_name=computer_name,
             user=str(managed.get("userPrincipalName") or ""),
@@ -349,7 +495,10 @@ def parse_run_states(
         )
 
         existing = newest_by_device.get(computer_name.casefold())
-        if existing is None or record.telemetry_collected > existing.telemetry_collected:
+        if (
+            existing is None
+            or record.telemetry_collected > existing.telemetry_collected
+        ):
             newest_by_device[computer_name.casefold()] = record
 
     return list(newest_by_device.values())
@@ -357,42 +506,111 @@ def parse_run_states(
 
 def merge_fleet_devices(
     managed_devices: Iterable[ManagedWindowsDevice],
+    ring_reports: Iterable[RingReport],
     telemetry_records: Iterable[DeviceTelemetry],
 ) -> list[FleetDevice]:
     telemetry_by_device = {
-        record.computer_name.casefold(): record for record in telemetry_records
+        record.computer_name.casefold(): record
+        for record in telemetry_records
     }
+    rings_by_device: dict[str, list[RingReport]] = {}
+
+    for report in ring_reports:
+        rings_by_device.setdefault(
+            report.computer_name.casefold(),
+            [],
+        ).append(report)
+
     fleet: list[FleetDevice] = []
+
     for managed in managed_devices:
-        telemetry = telemetry_by_device.get(managed.computer_name.casefold())
+        key = managed.computer_name.casefold()
+        reports = rings_by_device.get(key, [])
+        reports = sorted(
+            reports,
+            key=lambda report: report.ring_name.casefold(),
+        )
+        ring_names = tuple(report.ring_name for report in reports)
+        ring_count = len(ring_names)
+
+        if ring_count == 0:
+            ring_state = "none"
+            ring_status = "not-reported"
+            ring_last_reported = None
+            ring_user = ""
+        elif ring_count == 1:
+            ring_state = "one"
+            ring_status = reports[0].status
+            ring_last_reported = reports[0].last_reported
+            ring_user = reports[0].user
+        else:
+            ring_state = "multiple"
+            ring_status = "multiple"
+            ring_last_reported = max(
+                (
+                    report.last_reported
+                    for report in reports
+                    if report.last_reported is not None
+                ),
+                default=None,
+            )
+            ring_user = next(
+                (report.user for report in reports if report.user),
+                "",
+            )
+
+        telemetry = telemetry_by_device.get(key)
         if telemetry is None:
-            fleet.append(FleetDevice(
-                computer_name=managed.computer_name,
-                user=managed.user,
-                last_restart=None,
-                telemetry_collected=None,
-                uptime_days=None,
-                telemetry_age_hours=None,
-                telemetry_status="missing",
-            ))
+            fleet.append(
+                FleetDevice(
+                    computer_name=managed.computer_name,
+                    user=managed.user or ring_user,
+                    ring_names=ring_names,
+                    ring_count=ring_count,
+                    ring_state=ring_state,
+                    ring_status=ring_status,
+                    ring_last_reported=ring_last_reported,
+                    last_restart=None,
+                    telemetry_collected=None,
+                    uptime_days=None,
+                    telemetry_age_hours=None,
+                    telemetry_status="missing",
+                )
+            )
             continue
-        fleet.append(FleetDevice(
-            computer_name=managed.computer_name,
-            user=telemetry.user or managed.user,
-            last_restart=telemetry.last_restart,
-            telemetry_collected=telemetry.telemetry_collected,
-            uptime_days=telemetry.uptime_days,
-            telemetry_age_hours=telemetry.telemetry_age_hours,
-            telemetry_status="fresh" if telemetry.fresh else "stale",
-        ))
+
+        fleet.append(
+            FleetDevice(
+                computer_name=managed.computer_name,
+                user=telemetry.user or managed.user or ring_user,
+                ring_names=ring_names,
+                ring_count=ring_count,
+                ring_state=ring_state,
+                ring_status=ring_status,
+                ring_last_reported=ring_last_reported,
+                last_restart=telemetry.last_restart,
+                telemetry_collected=telemetry.telemetry_collected,
+                uptime_days=telemetry.uptime_days,
+                telemetry_age_hours=telemetry.telemetry_age_hours,
+                telemetry_status="fresh" if telemetry.fresh else "stale",
+            )
+        )
+
     return fleet
 
 
 def build_top_table(
-    records: Iterable[FleetDevice], *, top_n: int, local_tz: ZoneInfo
+    records: Iterable[FleetDevice],
+    *,
+    top_n: int,
+    local_tz: ZoneInfo,
 ) -> str:
     fresh = sorted(
-        (record for record in records if record.fresh and record.uptime_days is not None),
+        (
+            record
+            for record in records
+            if record.fresh and record.uptime_days is not None
+        ),
         key=lambda record: record.uptime_days or 0.0,
         reverse=True,
     )[:top_n]
@@ -405,7 +623,9 @@ def build_top_table(
         "-- ------------------------ -------- --------------------- ------------------------------",
     ]
     for index, record in enumerate(fresh, start=1):
-        restart = record.last_restart.astimezone(local_tz).strftime("%d/%m/%Y %I:%M %p")
+        restart = record.last_restart.astimezone(local_tz).strftime(
+            "%d/%m/%Y %I:%M %p"
+        )
         user = record.user or "-"
         lines.append(
             f"{index:>2} {record.computer_name[:24]:<24} "
@@ -415,73 +635,171 @@ def build_top_table(
 
 
 def build_metrics(
-    records: list[FleetDevice], *, config: Config, now: datetime
+    records: list[FleetDevice],
+    *,
+    config: Config,
+    now: datetime,
 ) -> dict[str, str]:
     local_tz = ZoneInfo(config.timezone_name)
-    reporting = [r for r in records if r.telemetry_status != "missing"]
-    fresh = [r for r in records if r.telemetry_status == "fresh"]
-    stale = [r for r in records if r.telemetry_status == "stale"]
-    missing = [r for r in records if r.telemetry_status == "missing"]
+
+    telemetry_reporting = [
+        record
+        for record in records
+        if record.telemetry_status != "missing"
+    ]
+    fresh = [
+        record
+        for record in records
+        if record.telemetry_status == "fresh"
+    ]
+    stale = [
+        record
+        for record in records
+        if record.telemetry_status == "stale"
+    ]
+    missing = [
+        record
+        for record in records
+        if record.telemetry_status == "missing"
+    ]
+
+    ring_reporting = [
+        record
+        for record in records
+        if record.ring_count >= 1
+    ]
+    one_ring = [
+        record
+        for record in records
+        if record.ring_count == 1
+    ]
+    no_ring = [
+        record
+        for record in records
+        if record.ring_count == 0
+    ]
+    multiple_ring = [
+        record
+        for record in records
+        if record.ring_count > 1
+    ]
+
     latest_collection = max(
-        (r.telemetry_collected for r in reporting if r.telemetry_collected is not None),
+        (
+            record.telemetry_collected
+            for record in telemetry_reporting
+            if record.telemetry_collected is not None
+        ),
         default=None,
     )
     max_uptime = max(
-        (r.uptime_days for r in fresh if r.uptime_days is not None),
+        (
+            record.uptime_days
+            for record in fresh
+            if record.uptime_days is not None
+        ),
         default=0.0,
     )
+
     ranked_devices = sorted(
         records,
-        key=lambda r: (
-            r.uptime_days is not None,
-            r.uptime_days if r.uptime_days is not None else -1.0,
+        key=lambda record: (
+            record.uptime_days is not None,
+            record.uptime_days
+            if record.uptime_days is not None
+            else -1.0,
         ),
         reverse=True,
     )
-    ranked_fresh = [r for r in ranked_devices if r.telemetry_status == "fresh"]
-    serialised_devices = [r.as_json(local_tz) for r in ranked_devices]
+    ranked_fresh = [
+        record
+        for record in ranked_devices
+        if record.telemetry_status == "fresh"
+    ]
+    serialised_devices = [
+        record.as_json(local_tz)
+        for record in ranked_devices
+    ]
+
     summary = {
         "generated_at": now.astimezone(local_tz).isoformat(),
         "expected_devices": len(records),
-        "reporting_devices": len(reporting),
+        "ring_reporting_devices": len(ring_reporting),
+        "one_ring_devices": len(one_ring),
+        "no_ring_devices": len(no_ring),
+        "multiple_ring_devices": len(multiple_ring),
+        "reporting_devices": len(telemetry_reporting),
         "fresh_devices": len(fresh),
         "stale_devices": len(stale),
         "missing_devices": len(missing),
         "max_telemetry_age_hours": config.max_telemetry_age_hours,
         "max_uptime_days": round(max_uptime, 3),
-        "over_7_days": sum((r.uptime_days or 0.0) >= 7 for r in fresh),
-        "over_14_days": sum((r.uptime_days or 0.0) >= 14 for r in fresh),
-        "over_30_days": sum((r.uptime_days or 0.0) >= 30 for r in fresh),
+        "over_7_days": sum(
+            (record.uptime_days or 0.0) >= 7
+            for record in fresh
+        ),
+        "over_14_days": sum(
+            (record.uptime_days or 0.0) >= 14
+            for record in fresh
+        ),
+        "over_30_days": sum(
+            (record.uptime_days or 0.0) >= 30
+            for record in fresh
+        ),
         "devices": serialised_devices,
-        "top": [r.as_json(local_tz) for r in ranked_fresh[: config.top_n]],
+        "top": [
+            record.as_json(local_tz)
+            for record in ranked_fresh[: config.top_n]
+        ],
     }
 
     return {
-        "intune.windows.reporting.count": str(len(reporting)),
+        "intune.windows.reporting.count": str(len(telemetry_reporting)),
         "intune.windows.fresh.count": str(len(fresh)),
         "intune.windows.stale.count": str(len(stale)),
+        "intune.windows.ring.reporting.count": str(len(ring_reporting)),
+        "intune.windows.ring.one.count": str(len(one_ring)),
+        "intune.windows.ring.none.count": str(len(no_ring)),
+        "intune.windows.ring.multiple.count": str(len(multiple_ring)),
         "intune.windows.max.uptime.days": f"{max_uptime:.3f}",
         "intune.windows.uptime.over7.count": str(
-            sum(record.uptime_days >= 7 for record in fresh)
+            sum(
+                (record.uptime_days or 0.0) >= 7
+                for record in fresh
+            )
         ),
         "intune.windows.uptime.over14.count": str(
-            sum(record.uptime_days >= 14 for record in fresh)
+            sum(
+                (record.uptime_days or 0.0) >= 14
+                for record in fresh
+            )
         ),
         "intune.windows.uptime.over30.count": str(
-            sum(record.uptime_days >= 30 for record in fresh)
+            sum(
+                (record.uptime_days or 0.0) >= 30
+                for record in fresh
+            )
         ),
         "intune.windows.last.collection.epoch": str(
-            int(latest_collection.timestamp()) if latest_collection else 0
+            int(latest_collection.timestamp())
+            if latest_collection
+            else 0
         ),
         "intune.windows.top10": build_top_table(
-            records, top_n=config.top_n, local_tz=local_tz
+            records,
+            top_n=config.top_n,
+            local_tz=local_tz,
         ),
-        "intune.windows.summary.json": json.dumps(summary, separators=(",", ":")),
+        "intune.windows.summary.json": json.dumps(
+            summary,
+            separators=(",", ":"),
+        ),
     }
 
 
 def send_metrics(config: Config, metrics: dict[str, str]) -> None:
     failures: list[str] = []
+
     for key, value in metrics.items():
         command = [
             config.zabbix_sender,
@@ -504,44 +822,84 @@ def send_metrics(config: Config, metrics: dict[str, str]) -> None:
             check=False,
         )
         if completed.returncode != 0:
-            failures.append(f"{key}: {completed.stdout.strip()}")
+            failures.append(
+                f"{key}: {completed.stdout.strip()}"
+            )
         else:
             LOG.debug("Sent %s", key)
 
     if failures:
-        raise RuntimeError("zabbix_sender failure(s): " + " | ".join(failures))
+        raise RuntimeError(
+            "zabbix_sender failure(s): " + " | ".join(failures)
+        )
 
 
-def collect(config: Config) -> tuple[list[DeviceTelemetry], dict[str, str]]:
+def collect(
+    config: Config,
+) -> tuple[list[FleetDevice], dict[str, str]]:
     now = datetime.now(timezone.utc)
     token = get_access_token(config)
+
+    raw_managed_devices = fetch_managed_windows_devices(
+        config,
+        token,
+    )
+    rings = fetch_update_rings(config, token)
+    raw_ring_statuses = fetch_ring_device_statuses(
+        config,
+        token,
+        rings,
+    )
     raw_states = fetch_run_states(config, token)
-    raw_managed_devices = fetch_managed_windows_devices(config, token)
+
+    managed_devices = parse_managed_windows_devices(
+        raw_managed_devices
+    )
+    ring_reports = parse_ring_reports(raw_ring_statuses)
     telemetry_records = parse_run_states(
         raw_states,
         now=now,
         max_age_hours=config.max_telemetry_age_hours,
     )
-    managed_devices = parse_managed_windows_devices(raw_managed_devices)
-    records = merge_fleet_devices(managed_devices, telemetry_records)
-    metrics = build_metrics(records, config=config, now=now)
+
+    records = merge_fleet_devices(
+        managed_devices,
+        ring_reports,
+        telemetry_records,
+    )
+    metrics = build_metrics(
+        records,
+        config=config,
+        now=now,
+    )
     return records, metrics
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+def parse_args(
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Read Intune reboot telemetry and publish fleet metrics to Zabbix."
+        description=(
+            "Read Intune update-ring and reboot telemetry "
+            "and publish fleet metrics to Zabbix."
+        )
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Read Graph and print generated metrics without calling zabbix_sender.",
+        help=(
+            "Read Graph and print generated metrics without "
+            "calling zabbix_sender."
+        ),
     )
     parser.add_argument(
         "--json",
         action="store_true",
         dest="json_output",
-        help="With --dry-run, print summary JSON instead of the top-10 table.",
+        help=(
+            "With --dry-run, print summary JSON instead of "
+            "the top-10 table."
+        ),
     )
     parser.add_argument(
         "--log-level",
@@ -557,18 +915,29 @@ def main(argv: list[str] | None = None) -> int:
         level=getattr(logging, args.log_level),
         format="%(asctime)s %(levelname)s %(message)s",
     )
+
     try:
         config = Config.from_env()
         records, metrics = collect(config)
-        summary = json.loads(metrics["intune.windows.summary.json"])
+        summary = json.loads(
+            metrics["intune.windows.summary.json"]
+        )
         LOG.info(
-            "Fleet %d expected devices (%d reporting, %d fresh, %d stale, %d missing)",
+            (
+                "Fleet %d Windows devices "
+                "(%d one ring, %d no ring, %d multiple rings; "
+                "%d telemetry reporting, %d fresh, %d stale, %d missing)"
+            ),
             summary["expected_devices"],
+            summary["one_ring_devices"],
+            summary["no_ring_devices"],
+            summary["multiple_ring_devices"],
             summary["reporting_devices"],
             summary["fresh_devices"],
             summary["stale_devices"],
             summary["missing_devices"],
         )
+
         if args.dry_run:
             if args.json_output:
                 print(metrics["intune.windows.summary.json"])
