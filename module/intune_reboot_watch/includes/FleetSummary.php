@@ -71,11 +71,7 @@ final class FleetSummary {
         ];
     }
 
-    /**
-     * @param array<int, mixed> $candidates
-     *
-     * @return list<array<string, mixed>>
-     */
+    /** @param array<int, mixed> $candidates */
     private function normaliseRows(array $candidates): array {
         $rows = [];
 
@@ -108,15 +104,14 @@ final class FleetSummary {
             }
 
             $rows[] = [
+                'managed_device_id' => trim((string) ($candidate['managed_device_id'] ?? '')),
                 'computer_name' => $computer,
                 'user' => trim((string) ($candidate['user'] ?? '')),
                 'ring_name' => trim((string) ($candidate['ring_name'] ?? '')),
                 'ring_count' => self::nonNegativeInt($candidate['ring_count'] ?? 0),
                 'ring_state' => $ring_state,
                 'ring_status' => trim((string) ($candidate['ring_status'] ?? '')),
-                'ring_last_reported' => trim(
-                    (string) ($candidate['ring_last_reported'] ?? '')
-                ),
+                'ring_last_reported' => trim((string) ($candidate['ring_last_reported'] ?? '')),
                 'last_restart' => trim((string) ($candidate['last_restart'] ?? '')),
                 'telemetry_collected' => trim((string) ($candidate['telemetry_collected'] ?? '')),
                 'uptime_days' => $uptime,
@@ -124,9 +119,7 @@ final class FleetSummary {
                 'fresh' => $status === 'fresh',
                 'telemetry_status' => $status,
                 'reboot_state' => $reboot_state,
-                'reboot_priority' => self::nonNegativeInt(
-                    $candidate['reboot_priority'] ?? 0
-                ),
+                'reboot_priority' => self::nonNegativeInt($candidate['reboot_priority'] ?? 0),
                 'reboot_due' => trim((string) ($candidate['reboot_due'] ?? ''))
             ];
         }
