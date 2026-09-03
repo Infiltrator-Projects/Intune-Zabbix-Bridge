@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.2 — 2026-09-03
+
+- Fixed Reboot Watch population semantics: the managed Windows inventory is authoritative and reboot telemetry is left-joined onto it.
+- Devices without reboot-telemetry run states now remain visible as explicit Missing rows.
+- Added Expected and Missing counters plus per-device telemetry state without changing existing Zabbix trapper keys.
+- Added regressions for inventory de-duplication and missing telemetry.
+
 ## 0.7.1 — 2026-09-03
 
 - Rebuilt and requalified the current bridge on GitHub-hosted CI for the coordinated project release refresh.
