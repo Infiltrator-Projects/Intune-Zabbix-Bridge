@@ -67,6 +67,38 @@ zabbix_export:
           history: 90d
           trends: 365d
           value_type: UNSIGNED
+        - uuid: 0f1f53a7d84f4c18a3156891060b6e37
+          name: 'Intune: Windows missed weekly restart'
+          type: TRAP
+          key: intune.windows.reboot.missed.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: dca2b77c792745d196e16b9ee2680d40
+          name: 'Intune: Windows current for weekly restart'
+          type: TRAP
+          key: intune.windows.reboot.current.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: e7ee47a9506a42abb644439579703485
+          name: 'Intune: Windows weekly restart state unknown'
+          type: TRAP
+          key: intune.windows.reboot.unknown.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
+        - uuid: 34a98b970b114dafbe374875c0319d48
+          name: 'Intune: Windows weekly restart policy not active'
+          type: TRAP
+          key: intune.windows.reboot.notactive.count
+          delay: '0'
+          history: 90d
+          trends: 365d
+          value_type: UNSIGNED
         - uuid: 43fc6ee601814746a6b1d4053b1d8406
           name: 'Intune: Maximum Windows uptime'
           type: TRAP
