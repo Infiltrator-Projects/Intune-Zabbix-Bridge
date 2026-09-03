@@ -9,16 +9,17 @@ readonly VERSION="$(awk -F'"' '/^[[:space:]]*"version"[[:space:]]*:/ {print $4; 
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "ERROR: invalid manifest version." >&2; exit 1; }
 stage="$(mktemp -d)"; trap 'rm -rf "$stage"' EXIT
 root="$stage/${PKG}_${VERSION}_${ARCH}"
-mkdir -p "$root/DEBIAN" "$root/usr/bin" "$root/usr/lib/intune-zabbix-bridge" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge" "$root/usr/lib/systemd/system" "$root/usr/share/intune-zabbix-bridge/zabbix" "$root/usr/share/zabbix/modules" "$root/usr/share/doc/$PKG" "$root/etc/intune-zabbix-bridge"
+mkdir -p "$root/DEBIAN" "$root/usr/bin" "$root/usr/lib/intune-zabbix-bridge" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge" "$root/usr/lib/systemd/system" "$root/usr/share/intune-zabbix-bridge/zabbix" "$root/usr/share/zabbix/modules" "$root/usr/share/doc/$PKG" "$root/etc/intune-zabbix-bridge/import"
 sed "s/^Version: .*/Version: $VERSION/" "$ROOT_DIR/packaging/debian/control" > "$root/DEBIAN/control"
 install -m 0755 "$ROOT_DIR/packaging/debian/postinst" "$root/DEBIAN/postinst"
 install -m 0755 "$ROOT_DIR/packaging/debian/prerm" "$root/DEBIAN/prerm"
 install -m 0755 "$ROOT_DIR/packaging/debian/postrm" "$root/DEBIAN/postrm"
 install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/__init__.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/__init__.py"
 install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/collector.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/collector.py"
+install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/hardened.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/hardened.py"
 cat > "$root/usr/bin/intune-zabbix-bridge" <<'PY'
 #!/usr/bin/python3
-from intune_zabbix_bridge.collector import main
+from intune_zabbix_bridge.hardened import main
 raise SystemExit(main())
 PY
 chmod 0755 "$root/usr/bin/intune-zabbix-bridge"
@@ -33,6 +34,7 @@ cp -a "$ROOT_DIR/module/intune_reboot_watch" "$root/usr/share/zabbix/modules/int
 install -m 0644 "$ROOT_DIR/README.md" "$root/usr/share/doc/$PKG/README.md"
 find "$root/usr/share/zabbix/modules/intune_reboot_watch" -type d -exec chmod 0755 {} +
 find "$root/usr/share/zabbix/modules/intune_reboot_watch" -type f -exec chmod 0644 {} +
+chmod 0700 "$root/etc/intune-zabbix-bridge/import"
 mkdir -p "$DIST_DIR"
 out="$DIST_DIR/${PKG}_${VERSION}_${ARCH}.deb"
 dpkg-deb --root-owner-group --build "$root" "$out" >/dev/null
