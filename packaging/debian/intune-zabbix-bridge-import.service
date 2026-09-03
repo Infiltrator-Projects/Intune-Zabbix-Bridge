@@ -1,6 +1,12 @@
 [Unit]
-Description=Import Intune Zabbix Bridge configuration
+Description=Import protected Intune Zabbix Bridge configuration
 
 [Service]
 Type=oneshot
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
 ExecStart=/usr/lib/intune-zabbix-bridge/import-config
