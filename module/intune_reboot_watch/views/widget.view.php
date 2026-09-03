@@ -76,12 +76,18 @@ $health = (new CDiv([
     ->setAttribute('role', 'status');
 
 $stats = (new CDiv([
+    $stat(_('Expected'), (string) $summary['expected_devices']),
     $stat(_('Reporting'), (string) $summary['reporting_devices']),
     $stat(_('Fresh'), (string) $summary['fresh_devices'], 'is-good'),
     $stat(
         _('Stale'),
         (string) $summary['stale_devices'],
         (int) $summary['stale_devices'] > 0 ? 'is-warn' : ''
+    ),
+    $stat(
+        _('Missing'),
+        (string) $summary['missing_devices'],
+        (int) $summary['missing_devices'] > 0 ? 'is-critical' : ''
     ),
     $stat(
         _('Longest uptime'),
@@ -122,6 +128,7 @@ $table = (new CTableInfo())
         $sort_header('#', 'rank', 'number', 'asc'),
         $sort_header(_('Computer'), 'computer', 'text', 'asc'),
         $sort_header(_('User'), 'user', 'text', 'asc'),
+        $sort_header(_('Telemetry'), 'telemetry-status', 'text', 'asc'),
         $sort_header(_('Uptime'), 'uptime', 'number', 'desc', true),
         $sort_header(_('Last restart'), 'last-restart', 'number', 'desc'),
         $sort_header(_('Telemetry collected'), 'telemetry-collected', 'number', 'desc'),
@@ -129,41 +136,56 @@ $table = (new CTableInfo())
     ]);
 
 foreach ($data['rows'] as $row) {
-    $uptime = (new CSpan(number_format((float) $row['uptime_days'], 1).' d'))
+    $uptime = (new CSpan((string) $row['uptime_display']))
         ->addClass('irw-uptime')
         ->addClass('is-'.$row['severity']);
+    $telemetry = (new CSpan((string) $row['telemetry_label']))
+        ->addClass('irw-telemetry-status')
+        ->addClass('is-'.$row['telemetry_status']);
 
     $table->addRow(
         (new CRow([
             (new CSpan((string) $row['rank']))->addClass('irw-rank'),
             (new CSpan((string) $row['computer_name']))->addClass('irw-computer'),
             (string) ($row['user'] !== '' ? $row['user'] : '—'),
+            $telemetry,
             $uptime,
             (string) $row['last_restart'],
             (string) $row['telemetry_collected'],
-            number_format((float) $row['telemetry_age_hours'], 1).' h'
+            (string) $row['telemetry_age_display']
         ]))
             ->addClass('irw-data-row')
+            ->addClass('is-'.$row['telemetry_status'])
             ->setAttribute('data-computer-name', (string) $row['computer_name'])
             ->setAttribute('data-user', (string) $row['user'])
             ->setAttribute('data-sort-rank', (string) $row['rank'])
             ->setAttribute('data-sort-computer', (string) $row['computer_name'])
             ->setAttribute('data-sort-user', (string) $row['user'])
-            ->setAttribute('data-sort-uptime', (string) $row['uptime_days'])
+            ->setAttribute('data-sort-telemetry-status', (string) $row['telemetry_status'])
+            ->setAttribute(
+                'data-sort-uptime',
+                $row['uptime_days'] === null ? '' : (string) $row['uptime_days']
+            )
             ->setAttribute('data-sort-last-restart', (string) $row['last_restart_sort'])
             ->setAttribute(
                 'data-sort-telemetry-collected',
                 (string) $row['telemetry_collected_sort']
             )
-            ->setAttribute('data-sort-telemetry-age', (string) $row['telemetry_age_hours'])
+            ->setAttribute(
+                'data-sort-telemetry-age',
+                $row['telemetry_age_hours'] === null
+                    ? ''
+                    : (string) $row['telemetry_age_hours']
+            )
     );
 }
 
 if ($data['rows'] === []) {
-    $table->setNoDataMessage(_('No fresh Windows reboot telemetry is available.'));
+    $table->setNoDataMessage(_('No managed Windows devices are available.'));
 }
 
 $footer = (new CDiv([
+    (new CSpan(_('Missing telemetry is shown explicitly, never hidden.'))),
     (new CSpan(_('Collector threshold: ').(string) $data['stale_minutes'].' min')),
     (new CSpan(_('Zabbix received: ').(string) $data['received_at']))
 ]))->addClass('irw-footer');
