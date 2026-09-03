@@ -286,6 +286,30 @@ final class WidgetView extends CControllerDashboardWidgetView {
                 'value_type' => ITEM_VALUE_TYPE_UINT64
             ],
             [
+                'name' => 'Intune: Windows reporting an update ring',
+                'key_' => 'intune.windows.ring.reporting.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows reporting exactly one update ring',
+                'key_' => 'intune.windows.ring.one.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows with no update ring reported',
+                'key_' => 'intune.windows.ring.none.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
+                'name' => 'Intune: Windows reporting multiple update rings',
+                'key_' => 'intune.windows.ring.multiple.count',
+                'type' => ITEM_TYPE_TRAPPER,
+                'value_type' => ITEM_VALUE_TYPE_UINT64
+            ],
+            [
                 'name' => 'Intune: Maximum Windows uptime',
                 'key_' => 'intune.windows.max.uptime.days',
                 'type' => ITEM_TYPE_TRAPPER,
@@ -349,11 +373,28 @@ final class WidgetView extends CControllerDashboardWidgetView {
                 : null;
             $last_restart = (string) ($row['last_restart'] ?? '');
             $telemetry_collected = (string) ($row['telemetry_collected'] ?? '');
+            $ring_last_reported = (string) ($row['ring_last_reported'] ?? '');
+            $ring_state = (string) ($row['ring_state'] ?? 'none');
+            if (!in_array($ring_state, ['one', 'none', 'multiple'], true)) {
+                $ring_state = 'none';
+            }
+            $ring_status = trim((string) ($row['ring_status'] ?? ''));
 
             $result[] = [
                 'rank' => $index + 1,
                 'computer_name' => (string) ($row['computer_name'] ?? ''),
                 'user' => (string) ($row['user'] ?? ''),
+                'ring_name' => (string) ($row['ring_name'] ?? ''),
+                'ring_count' => max(0, (int) ($row['ring_count'] ?? 0)),
+                'ring_state' => $ring_state,
+                'ring_state_label' => match ($ring_state) {
+                    'one' => _('One ring'),
+                    'multiple' => _('Multiple rings'),
+                    default => _('No ring reported')
+                },
+                'ring_status' => $ring_status !== '' ? $ring_status : '—',
+                'ring_last_reported' => $this->formatIsoTime($ring_last_reported),
+                'ring_last_reported_sort' => $this->isoTimestamp($ring_last_reported),
                 'uptime_days' => $uptime,
                 'uptime_display' => $uptime === null ? '—' : number_format($uptime, 1).' d',
                 'last_restart' => $this->formatIsoTime($last_restart),
