@@ -17,7 +17,11 @@ foreach ([
     'intune.windows.ring.reporting.count',
     'intune.windows.ring.one.count',
     'intune.windows.ring.none.count',
-    'intune.windows.ring.multiple.count'
+    'intune.windows.ring.multiple.count',
+    'intune.windows.reboot.missed.count',
+    'intune.windows.reboot.current.count',
+    'intune.windows.reboot.unknown.count',
+    'intune.windows.reboot.notactive.count'
 ] as $symbol) {
     if (strpos($source, $symbol) === false) {
         fwrite(STDERR, "FAIL: WidgetView no longer references {$symbol}.\n");
