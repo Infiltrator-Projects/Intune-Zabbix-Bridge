@@ -30,6 +30,14 @@ final class FleetSummary {
             'expected_devices' => self::nonNegativeInt(
                 $decoded['expected_devices'] ?? $decoded['reporting_devices'] ?? 0
             ),
+            'ring_reporting_devices' => self::nonNegativeInt(
+                $decoded['ring_reporting_devices'] ?? 0
+            ),
+            'one_ring_devices' => self::nonNegativeInt($decoded['one_ring_devices'] ?? 0),
+            'no_ring_devices' => self::nonNegativeInt($decoded['no_ring_devices'] ?? 0),
+            'multiple_ring_devices' => self::nonNegativeInt(
+                $decoded['multiple_ring_devices'] ?? 0
+            ),
             'reporting_devices' => self::nonNegativeInt($decoded['reporting_devices'] ?? 0),
             'fresh_devices' => self::nonNegativeInt($decoded['fresh_devices'] ?? 0),
             'stale_devices' => self::nonNegativeInt($decoded['stale_devices'] ?? 0),
@@ -72,9 +80,21 @@ final class FleetSummary {
                 ? self::nonNegativeFloat($candidate['uptime_days']) : null;
             $telemetry_age = array_key_exists('telemetry_age_hours', $candidate) && is_numeric($candidate['telemetry_age_hours'])
                 ? self::nonNegativeFloat($candidate['telemetry_age_hours']) : null;
+            $ring_state = strtolower(trim((string) ($candidate['ring_state'] ?? 'none')));
+            if (!in_array($ring_state, ['one', 'none', 'multiple'], true)) {
+                $ring_state = 'none';
+            }
+
             $rows[] = [
                 'computer_name' => $computer,
                 'user' => trim((string) ($candidate['user'] ?? '')),
+                'ring_name' => trim((string) ($candidate['ring_name'] ?? '')),
+                'ring_count' => self::nonNegativeInt($candidate['ring_count'] ?? 0),
+                'ring_state' => $ring_state,
+                'ring_status' => trim((string) ($candidate['ring_status'] ?? '')),
+                'ring_last_reported' => trim(
+                    (string) ($candidate['ring_last_reported'] ?? '')
+                ),
                 'last_restart' => trim((string) ($candidate['last_restart'] ?? '')),
                 'telemetry_collected' => trim((string) ($candidate['telemetry_collected'] ?? '')),
                 'uptime_days' => $uptime,
