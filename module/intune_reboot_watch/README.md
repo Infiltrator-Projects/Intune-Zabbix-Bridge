@@ -1,18 +1,27 @@
 # INTUNE — Reboot Watch
 
-**Release:** 0.7.3  
+**Release:** 0.7.4  
 **Platform:** Zabbix 7.0 LTS
 
-The widget self-provisions its Zabbix host group, fleet host and trapper items.
+Reboot Watch has one operational job: show the Windows machines covered by Intune update policy and tell us whether they have satisfied the required weekly restart.
 
-Reboot Watch deliberately keeps three independent signals visible:
+It keeps three independent signals visible:
 
-- the current Intune managed-Windows inventory is the estate;
-- Windows Update Ring `deviceStatuses` show which update ring(s) each computer has actually reported to Intune;
-- the hourly reboot telemetry script supplies actual Windows `LastBootUpTime`.
+- current Intune managed-Windows inventory;
+- Windows Update Ring `deviceStatuses`, including exactly one / none / multiple ring reporting;
+- hourly `Windows - Reboot Telemetry` containing the actual Windows `LastBootUpTime`.
 
-A Windows computer never disappears merely because either policy reporting or reboot telemetry is missing. The table explicitly shows **One ring**, **No ring reported**, **Multiple rings**, and **Fresh / Stale / Missing** reboot telemetry.
+The weekly requirement is evaluated from the real boot time against the configured weekly restart boundary. The St Augustine's defaults mirror the deployed catch-up policy: **Sunday 03:00**, first active occurrence **06/09/2026 03:00 Australia/Melbourne**.
 
-Search covers computer name, username and update-ring name. Every column heading is sortable.
+Per-device reboot state is:
 
-Collector deployment is one universal Debian package plus one separate `intune-zabbix-bridge.env` file. Put that file in the Linux user's Downloads folder; the package imports it and runs the collector automatically.
+- **MISSED** — one ring reported, fresh telemetry, and last boot is before the applicable weekly restart;
+- **Current** — last boot is at or after the applicable weekly restart;
+- **Unknown** — the policy is active but ring state or reboot telemetry is not trustworthy enough to decide;
+- **Not active** — the first configured weekly restart has not happened yet.
+
+Missing ring or telemetry data never makes a computer disappear.
+
+Search covers computer name, username and update-ring name. The default table ordering puts missed/unknown restart states ahead of current machines.
+
+Collector deployment remains one Debian package plus one `intune-zabbix-bridge.env` file.
