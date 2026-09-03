@@ -20,9 +20,11 @@ catch (InvalidArgumentException) {
 
 $summary = $parser->parse(json_encode([
     'generated_at' => '2026-09-02T03:00:00+00:00',
+    'expected_devices' => 4,
     'reporting_devices' => 3,
     'fresh_devices' => 2,
     'stale_devices' => 1,
+    'missing_devices' => 1,
     'max_uptime_days' => 20.5,
     'over_7_days' => 2,
     'over_14_days' => 1,
@@ -40,7 +42,10 @@ if ($summary['top'][0]['computer_name'] !== 'LONG') {
 if (count($summary['top']) !== 2) {
     fail_fleet('Rows were not bounded correctly.');
 }
-if ($summary['reporting_devices'] !== 3 || $summary['stale_devices'] !== 1) {
+if ($summary['expected_devices'] !== 4
+        || $summary['reporting_devices'] !== 3
+        || $summary['stale_devices'] !== 1
+        || $summary['missing_devices'] !== 1) {
     fail_fleet('Counters were not preserved.');
 }
 
@@ -49,15 +54,23 @@ $full_summary = $parser->parse(json_encode([
     'devices' => [
         ['computer_name' => 'PC-3', 'user' => 'c@example.com', 'uptime_days' => 3],
         ['computer_name' => 'PC-1', 'user' => 'a@example.com', 'uptime_days' => 1],
-        ['computer_name' => 'PC-2', 'user' => 'b@example.com', 'uptime_days' => 2]
+        ['computer_name' => 'PC-2', 'user' => 'b@example.com', 'uptime_days' => 2],
+        ['computer_name' => 'PC-MISSING', 'user' => 'missing@example.com',
+         'uptime_days' => null, 'telemetry_age_hours' => null,
+         'telemetry_status' => 'missing']
     ],
     'top' => [
         ['computer_name' => 'PC-3', 'user' => 'c@example.com', 'uptime_days' => 3]
     ]
 ], JSON_THROW_ON_ERROR), 2);
 
-if (count($full_summary['devices']) !== 3) {
+if (count($full_summary['devices']) !== 4) {
     fail_fleet('Full searchable device list was truncated.');
+}
+if ($full_summary['devices'][3]['computer_name'] !== 'PC-MISSING'
+        || $full_summary['devices'][3]['telemetry_status'] !== 'missing'
+        || $full_summary['devices'][3]['uptime_days'] !== null) {
+    fail_fleet('Missing telemetry device was not preserved explicitly.');
 }
 if (count($full_summary['top']) !== 2) {
     fail_fleet('Visible top list did not honour the row limit.');
