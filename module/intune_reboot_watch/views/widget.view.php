@@ -76,8 +76,19 @@ $health = (new CDiv([
     ->setAttribute('role', 'status');
 
 $stats = (new CDiv([
-    $stat(_('Expected'), (string) $summary['expected_devices']),
-    $stat(_('Reporting'), (string) $summary['reporting_devices']),
+    $stat(_('Windows'), (string) $summary['expected_devices']),
+    $stat(_('One ring'), (string) $summary['one_ring_devices'], 'is-good'),
+    $stat(
+        _('No ring reported'),
+        (string) $summary['no_ring_devices'],
+        (int) $summary['no_ring_devices'] > 0 ? 'is-critical' : ''
+    ),
+    $stat(
+        _('Multiple rings'),
+        (string) $summary['multiple_ring_devices'],
+        (int) $summary['multiple_ring_devices'] > 0 ? 'is-critical' : ''
+    ),
+    $stat(_('Telemetry'), (string) $summary['reporting_devices']),
     $stat(_('Fresh'), (string) $summary['fresh_devices'], 'is-good'),
     $stat(
         _('Stale'),
@@ -85,7 +96,7 @@ $stats = (new CDiv([
         (int) $summary['stale_devices'] > 0 ? 'is-warn' : ''
     ),
     $stat(
-        _('Missing'),
+        _('Missing telemetry'),
         (string) $summary['missing_devices'],
         (int) $summary['missing_devices'] > 0 ? 'is-critical' : ''
     ),
@@ -128,6 +139,9 @@ $table = (new CTableInfo())
         $sort_header('#', 'rank', 'number', 'asc'),
         $sort_header(_('Computer'), 'computer', 'text', 'asc'),
         $sort_header(_('User'), 'user', 'text', 'asc'),
+        $sort_header(_('Update ring'), 'ring-name', 'text', 'asc'),
+        $sort_header(_('Ring state'), 'ring-state', 'text', 'asc'),
+        $sort_header(_('Ring reported'), 'ring-reported', 'number', 'desc'),
         $sort_header(_('Telemetry'), 'telemetry-status', 'text', 'asc'),
         $sort_header(_('Uptime'), 'uptime', 'number', 'desc', true),
         $sort_header(_('Last restart'), 'last-restart', 'number', 'desc'),
@@ -142,12 +156,21 @@ foreach ($data['rows'] as $row) {
     $telemetry = (new CSpan((string) $row['telemetry_label']))
         ->addClass('irw-telemetry-status')
         ->addClass('is-'.$row['telemetry_status']);
+    $ring = (new CSpan((string) $row['ring_state_label']))
+        ->addClass('irw-ring-status')
+        ->addClass('is-'.$row['ring_state']);
+    $ring_state_text = $row['ring_state'] === 'one'
+        ? (string) $row['ring_status']
+        : (string) $row['ring_state_label'];
 
     $table->addRow(
         (new CRow([
             (new CSpan((string) $row['rank']))->addClass('irw-rank'),
             (new CSpan((string) $row['computer_name']))->addClass('irw-computer'),
             (string) ($row['user'] !== '' ? $row['user'] : '—'),
+            (string) ($row['ring_name'] !== '' ? $row['ring_name'] : '—'),
+            new CDiv([$ring, new CSpan(' '.$ring_state_text)]),
+            (string) $row['ring_last_reported'],
             $telemetry,
             $uptime,
             (string) $row['last_restart'],
@@ -156,11 +179,15 @@ foreach ($data['rows'] as $row) {
         ]))
             ->addClass('irw-data-row')
             ->addClass('is-'.$row['telemetry_status'])
+            ->addClass('is-ring-'.$row['ring_state'])
             ->setAttribute('data-computer-name', (string) $row['computer_name'])
             ->setAttribute('data-user', (string) $row['user'])
             ->setAttribute('data-sort-rank', (string) $row['rank'])
             ->setAttribute('data-sort-computer', (string) $row['computer_name'])
             ->setAttribute('data-sort-user', (string) $row['user'])
+            ->setAttribute('data-sort-ring-name', (string) $row['ring_name'])
+            ->setAttribute('data-sort-ring-state', $ring_state_text)
+            ->setAttribute('data-sort-ring-reported', (string) $row['ring_last_reported_sort'])
             ->setAttribute('data-sort-telemetry-status', (string) $row['telemetry_status'])
             ->setAttribute(
                 'data-sort-uptime',
@@ -185,7 +212,7 @@ if ($data['rows'] === []) {
 }
 
 $footer = (new CDiv([
-    (new CSpan(_('Missing telemetry is shown explicitly, never hidden.'))),
+    (new CSpan(_('Ring and reboot telemetry faults are shown explicitly, never hidden.'))),
     (new CSpan(_('Collector threshold: ').(string) $data['stale_minutes'].' min')),
     (new CSpan(_('Zabbix received: ').(string) $data['received_at']))
 ]))->addClass('irw-footer');
