@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.12 — 2026-09-04
+
+- Fixed the valid-collector/invalid-dashboard failure where the full 176-device summary could exceed Zabbix's text-history storage limit and be truncated after `zabbix_sender` reported success.
+- Compacts the telemetry-only wire summary by removing dormant ring/identity fields and the redundant top-ten copy while preserving every dashboard-visible row value and fleet counter.
+- Adds an explicit safe-size guard so an oversized summary fails closed before the generation commit marker is sent instead of replacing a valid dashboard generation with truncated JSON.
+- Added regression coverage using the current 176-device fleet size plus an intentionally oversized payload.
+
 ## 0.7.11 — 2026-09-04
 
 - Restored the proven remediation-telemetry population used by the working collector instead of expanding Reboot Watch to every managed Windows inventory record.
