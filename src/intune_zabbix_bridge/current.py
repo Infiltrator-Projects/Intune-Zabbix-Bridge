@@ -2,7 +2,7 @@
 """Shipped collector entry point.
 
 Emergency telemetry-only runtime: managed-device inventory and reboot telemetry
-continue publishing while Windows Update Ring collection is disabled.
+continue publishing while Windows Update Ring collection is temporarily disabled.
 Ring-report implementation remains packaged for later re-enablement, but the
 shipped service does not call it and reboot compliance does not depend on it.
 """
@@ -62,7 +62,7 @@ def collect_telemetry_only(
     )
 
     hardened.LOG.warning(
-        "Windows Update Ring collection is disabled; "
+        "Windows Update Ring collection is temporarily disabled; "
         "publishing managed-device inventory and reboot telemetry only."
     )
     records = hardened.merge_fleet_devices(
