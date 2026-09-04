@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.8 — 2026-09-04
+
+- Replaced the `getTargetedUsersAndDevices` ring-membership inference introduced in 0.7.7 with Intune's current `getConfigurationPolicyDevicesReport` device policy report.
+- Joins each ring report directly by `IntuneDeviceId` to immutable `managedDevice.id`; name/UPN is retained only as an unambiguous compatibility fallback.
+- Parses the report's returned schema instead of assuming fixed column positions, paginates every ring, and collapses duplicate device/ring rows to the newest report record.
+- The shipped Debian entry point now binds the hardened fleet/reboot collector to the current report-backed ring source.
+- Added regressions for schema parsing, report pagination, immutable identity, ambiguity, duplicate report rows, shipped entry-point selection, and removal of the old ring API path.
+- This addresses the failure mode where ring lookup stopped successful collector generations, leaving Reboot Watch stale while reboot telemetry in the last committed snapshot still appeared fresh.
+
 ## 0.7.7 — 2026-09-04
 
 - Replaced the deprecated Windows Update Ring `deviceStatuses` runtime path with Intune's current `getTargetedUsersAndDevices` targeting action, queried separately for each discovered Windows Update Ring.
