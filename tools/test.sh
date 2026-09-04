@@ -82,17 +82,14 @@ if command -v dpkg-deb >/dev/null 2>&1; then
 fi
 
 echo "[14/14] Release and APT publication contracts"
-! grep -Fq 'APT_REPOSITORY_DISPATCH_TOKEN' "$RELEASE_WORKFLOW" || { echo 'ERROR: release publishing must not depend on a manually configured cross-repository token.' >&2; exit 1; }
-grep -Fq 'Build public APT handoff from exact tested DEB' "$RELEASE_WORKFLOW" || { echo 'ERROR: exact tested DEB handoff is missing.' >&2; exit 1; }
-grep -Fq 'actions/configure-pages@v5' "$RELEASE_WORKFLOW" || { echo 'ERROR: Pages handoff configuration is missing.' >&2; exit 1; }
-grep -Fq 'actions/upload-pages-artifact@v3' "$RELEASE_WORKFLOW" || { echo 'ERROR: Pages handoff upload is missing.' >&2; exit 1; }
-grep -Fq 'actions/deploy-pages@v4' "$RELEASE_WORKFLOW" || { echo 'ERROR: Pages handoff deployment is missing.' >&2; exit 1; }
-grep -Fq "'{package:\$package,version:\$version,filename:\$filename,sha256:\$sha256,source_sha:\$source_sha}'" "$RELEASE_WORKFLOW" || { echo 'ERROR: handoff manifest must bind package, version, filename, SHA-256 and source commit.' >&2; exit 1; }
-grep -Fq 'Verify public APT handoff bytes' "$RELEASE_WORKFLOW" || { echo 'ERROR: public handoff byte verification is missing.' >&2; exit 1; }
-grep -Fq 'dists/alpha/main/binary-amd64/Packages.gz' "$RELEASE_WORKFLOW" || { echo 'ERROR: central Packages.gz verification is missing.' >&2; exit 1; }
-grep -Fq 'pool/main/$FILENAME' "$RELEASE_WORKFLOW" || { echo 'ERROR: central pool artifact verification is missing.' >&2; exit 1; }
-grep -Fq '.version == $version and .sha256 == $sha256' "$RELEASE_WORKFLOW" || { echo 'ERROR: central catalogue version/SHA verification is missing.' >&2; exit 1; }
-grep -Fq 'Public APT repository advertises and serves the exact tested intune-zabbix-bridge ${VERSION}.' "$RELEASE_WORKFLOW" || { echo 'ERROR: exact central APT success contract is missing.' >&2; exit 1; }
+grep -Fq 'APT_REPOSITORY_DISPATCH_TOKEN' "$RELEASE_WORKFLOW" || { echo 'ERROR: private Intune release must have an authenticated central APT handoff.' >&2; exit 1; }
+grep -Fq 'Mirror exact tested DEB into central APT repository' "$RELEASE_WORKFLOW"
+grep -Fq 'mirrored-packages/$filename' "$RELEASE_WORKFLOW"
+grep -Fq 'gh api --method PUT' "$RELEASE_WORKFLOW"
+grep -Fq 'different bytes; refusing to overwrite an immutable release' "$RELEASE_WORKFLOW"
+grep -Fq 'dists/alpha/main/binary-amd64/Packages.gz' "$RELEASE_WORKFLOW"
+grep -Fq 'Public APT repository advertises intune-zabbix-bridge ${version} in catalogue and Packages.gz.' "$RELEASE_WORKFLOW"
+! grep -Fq 'actions/configure-pages@v5' "$RELEASE_WORKFLOW" || { echo 'ERROR: private Intune release must not rely on GitHub Pages in the private source repository.' >&2; exit 1; }
 if grep -R -F "$VERSION" "$ROOT/tools" "$ROOT/.github" >/dev/null; then
     echo "ERROR: current release version is hard-coded in tools or CI." >&2
     grep -R -n -F "$VERSION" "$ROOT/tools" "$ROOT/.github" >&2 || true
