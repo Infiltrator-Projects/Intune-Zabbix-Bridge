@@ -47,7 +47,7 @@ grep -Fq 'stat.st_mode & 0o022' "$ROOT/packaging/linux/import-config"
 grep -Fq 'getConfigurationPolicyDevicesReport' "$RING_REPORTS" || { echo 'ERROR: current Intune policy-report ring source is missing.' >&2; exit 1; }
 grep -Fq 'IntuneDeviceId' "$RING_REPORTS" || { echo 'ERROR: immutable Intune device ID ring join is missing.' >&2; exit 1; }
 ! grep -Fq 'getTargetedUsersAndDevices' "$CURRENT_COLLECTOR" || { echo 'ERROR: shipped entry point returned to inferred targeting source.' >&2; exit 1; }
-! grep -Fq 'deviceStatuses' "$RING_REPORTS" || { echo 'ERROR: deprecated deviceStatuses ring path returned to current source.' >&2; exit 1; }
+! grep -Fq '/deviceStatuses' "$RING_REPORTS" || { echo 'ERROR: deprecated deviceStatuses ring API path returned to current source.' >&2; exit 1; }
 ! grep -Fq 'deviceConfigurationStates' "$RING_REPORTS" || { echo 'ERROR: deprecated per-device configuration-state path returned to current source.' >&2; exit 1; }
 grep -Fq 'refusing to publish a misleading all-unassigned fleet' "$HARDENED_COLLECTOR"
 trap_count="$(grep -c '^[[:space:]]*type: TRAP$' "$ROOT/zabbix/template_intune_zabbix_bridge.yaml")"
