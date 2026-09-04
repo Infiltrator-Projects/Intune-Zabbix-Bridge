@@ -1,6 +1,6 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.7.9  
+**Release:** 0.7.10  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** private/internal only
 
@@ -33,20 +33,18 @@ sudo install -o root -g root -m 0600 intune-zabbix-bridge.env \
 
 The package imports it into `/etc/intune-zabbix-bridge/bridge.env`, removes the inbox copy, enables the timer and performs the first collection. Per-user Downloads folders are not trusted.
 
-## Emergency 0.7.9 mode
+## Telemetry-only 0.7.10 mode
 
-Windows Update Ring collection is temporarily disabled in the shipped runtime. The existing Entra application does not currently have `DeviceManagementConfiguration.Read.All`; ring enumeration therefore returned HTTP 403 and aborted every 15-minute collector run.
+Windows Update Ring collection is temporarily disabled in the shipped runtime. The collector makes **no update-ring Graph request**, so a missing `DeviceManagementConfiguration.Read.All` permission cannot stop the 15-minute collection cycle.
 
-0.7.9 deliberately makes **no update-ring Graph request**. It restores the signals that were already working before ring collection was added:
+0.7.10 keeps the operational dashboard limited to the working signals:
 
 - current managed-Windows inventory keyed by immutable `managedDevice.id`;
-- reboot telemetry joined by expanded `managedDevice.id`;
-- telemetry freshness, last restart and uptime;
-- normal 15-minute Zabbix publication.
+- weekly reboot compliance evaluated from fresh reboot telemetry;
+- actual last restart and uptime;
+- telemetry freshness/age and collector freshness.
 
-The newer ring-report implementation remains packaged but dormant so it can be re-enabled later after the required Intune permission and report path are deliberately configured and tested. A regression test proves the shipped emergency runtime does not call ring enumeration or ring-report Graph sources.
-
-Because ring collection is disabled, ring and ring-dependent reboot-policy fields are not authoritative in this emergency release. Inventory and reboot telemetry remain authoritative.
+Update-ring cards, columns, search terms and ring fault states are removed from the shipped widget while this mode is active. The dormant ring-report implementation remains packaged only for later deliberate re-enablement.
 
 The Zabbix widget is read-only. Import/link the packaged `Intune Zabbix Bridge` template and create/link the `Microsoft Intune - Windows Fleet` host during setup; merely opening the dashboard never creates Zabbix objects. Trapper items in the packaged template accept submissions from `127.0.0.1` and `::1` only by default.
 
