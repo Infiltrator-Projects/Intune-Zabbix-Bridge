@@ -2,7 +2,7 @@
 
 **Release:** 0.7.10  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
-**Distribution:** private/internal only
+**Distribution:** private/internal source; public APT package
 
 There is one Debian package for deployment. It contains no tenant credentials and no site-specific Intune script ID.
 
@@ -50,4 +50,4 @@ The Zabbix widget is read-only. Import/link the packaged `Intune Zabbix Bridge` 
 
 The collector refuses to publish an empty Windows estate, sends the summary JSON only after all companion metrics have succeeded, and treats a materially future collector timestamp as unknown rather than current.
 
-Release publication builds and tests the exact DEB and RUN artifacts before creating the private GitHub release. Public APT mirroring is a separate authenticated step and the release workflow fails if that handoff cannot be completed and verified.
+Release publication builds and tests the exact DEB and RUN artifacts before creating the versioned GitHub release. The Debian package is also published through the public Infiltrator APT repository; deployment credentials remain private and are never embedded in the package.
