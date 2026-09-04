@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.9 — 2026-09-04
+
+- Temporarily removed Windows Update Ring collection from the shipped runtime so a missing `DeviceManagementConfiguration.Read.All` permission cannot stop the collector.
+- The service now publishes managed-Windows inventory and reboot telemetry without making any update-ring Graph request.
+- The ring-report implementation remains packaged but dormant for later re-enablement after permissions are deliberately configured and tested.
+- Added a regression proving the shipped runtime does not call ring enumeration or ring-report Graph sources.
+- This is an emergency availability hotfix to restore the 15-minute collector cadence while preserving current device identity and reboot telemetry.
+
 ## 0.7.8 — 2026-09-04
 
 - Replaced 0.7.7's `getTargetedUsersAndDevices` membership inference with Intune's current `getConfigurationPolicyDevicesReport` device policy report.
