@@ -5,6 +5,8 @@ readonly MODULE="$ROOT/module/intune_reboot_watch"
 readonly MANIFEST="$MODULE/manifest.json"
 readonly RELEASE_WORKFLOW="$ROOT/.github/workflows/test.yml"
 readonly HARDENED_COLLECTOR="$ROOT/src/intune_zabbix_bridge/hardened.py"
+readonly CURRENT_COLLECTOR="$ROOT/src/intune_zabbix_bridge/current.py"
+readonly RING_REPORTS="$ROOT/src/intune_zabbix_bridge/ring_reports.py"
 
 for cmd in jq php node python3 bash grep awk stat; do command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing test command: $cmd" >&2; exit 1; }; done
 readonly VERSION="$(jq -r '.version // empty' "$MANIFEST")"
@@ -42,9 +44,11 @@ grep -Fq 'PathExists=/etc/intune-zabbix-bridge/import/intune-zabbix-bridge.env' 
 grep -Fq 'SOURCE = Path("/etc/intune-zabbix-bridge/import/intune-zabbix-bridge.env")' "$ROOT/packaging/linux/import-config"
 grep -Fq 'stat.st_uid != 0' "$ROOT/packaging/linux/import-config"
 grep -Fq 'stat.st_mode & 0o022' "$ROOT/packaging/linux/import-config"
-grep -Fq 'getTargetedUsersAndDevices' "$HARDENED_COLLECTOR" || { echo 'ERROR: current update-ring targeting source is missing.' >&2; exit 1; }
-! grep -Fq 'fetch_ring_device_statuses' "$HARDENED_COLLECTOR" || { echo 'ERROR: deprecated deviceStatuses ring path returned to shipped collector.' >&2; exit 1; }
-! grep -Fq 'deviceConfigurationStates' "$HARDENED_COLLECTOR" || { echo 'ERROR: deprecated per-device configuration-state path returned to shipped collector.' >&2; exit 1; }
+grep -Fq 'getConfigurationPolicyDevicesReport' "$RING_REPORTS" || { echo 'ERROR: current Intune policy-report ring source is missing.' >&2; exit 1; }
+grep -Fq 'IntuneDeviceId' "$RING_REPORTS" || { echo 'ERROR: immutable Intune device ID ring join is missing.' >&2; exit 1; }
+! grep -Fq 'getTargetedUsersAndDevices' "$CURRENT_COLLECTOR" || { echo 'ERROR: shipped entry point returned to inferred targeting source.' >&2; exit 1; }
+! grep -Fq 'deviceStatuses' "$RING_REPORTS" || { echo 'ERROR: deprecated deviceStatuses ring path returned to current source.' >&2; exit 1; }
+! grep -Fq 'deviceConfigurationStates' "$RING_REPORTS" || { echo 'ERROR: deprecated per-device configuration-state path returned to current source.' >&2; exit 1; }
 grep -Fq 'refusing to publish a misleading all-unassigned fleet' "$HARDENED_COLLECTOR"
 trap_count="$(grep -c '^[[:space:]]*type: TRAP$' "$ROOT/zabbix/template_intune_zabbix_bridge.yaml")"
 allowed_count="$(grep -c "^[[:space:]]*allowed_hosts: '127.0.0.1,::1'$" "$ROOT/zabbix/template_intune_zabbix_bridge.yaml")"
@@ -73,7 +77,9 @@ if command -v dpkg-deb >/dev/null 2>&1; then
     [[ "$(jq -r '.version' "$installed")" == "$VERSION" ]]
     [[ -x "$extract/usr/lib/intune-zabbix-bridge/import-config" ]]
     [[ -f "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/hardened.py" ]]
-    grep -Fq 'from intune_zabbix_bridge.hardened import main' "$extract/usr/bin/intune-zabbix-bridge"
+    [[ -f "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/ring_reports.py" ]]
+    [[ -f "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/current.py" ]]
+    grep -Fq 'from intune_zabbix_bridge.current import main' "$extract/usr/bin/intune-zabbix-bridge"
     [[ -f "$extract/usr/lib/systemd/system/intune-zabbix-bridge-import.path" ]]
     [[ -f "$extract/usr/lib/systemd/system/intune-zabbix-bridge-import.service" ]]
     [[ "$(stat -c '%a' "$extract/etc/intune-zabbix-bridge/import")" == "700" ]]
