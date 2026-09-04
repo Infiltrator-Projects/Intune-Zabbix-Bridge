@@ -4,9 +4,9 @@
   "type": "widget",
   "name": "INTUNE — Reboot Watch",
   "namespace": "IntuneRebootWatch",
-  "version": "0.7.7",
+  "version": "0.7.8",
   "author": "Infiltrator Projects",
-  "description": "Zabbix 7.0 dashboard for Intune update-ring targeting, weekly restart compliance and reboot telemetry.",
+  "description": "Zabbix 7.0 dashboard for Intune update-ring policy reporting, weekly restart compliance and reboot telemetry.",
   "actions": {
     "widget.intune_reboot_watch.view": {
       "class": "WidgetView"
