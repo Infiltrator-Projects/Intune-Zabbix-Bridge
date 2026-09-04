@@ -4,10 +4,10 @@
 
 INTUNE — Reboot Watch answers two separate questions for the managed Windows estate:
 
-1. has Intune reported exactly one Windows Update Ring for this machine?
+1. is this machine effectively targeted by exactly one Windows Update Ring?
 2. has the machine rebooted since the applicable required weekly restart?
 
-Neither policy reporting nor reboot telemetry is allowed to make a computer disappear.
+Neither policy targeting nor reboot telemetry is allowed to make a computer disappear.
 
 ## Data flow
 
@@ -16,8 +16,8 @@ Intune managed Windows inventory
         │
         ├──────────── estate ────────────────────────────────┐
         │                                                    │
-Windows Update Ring deviceStatuses                    Windows client
-        │                                              LastBootUpTime
+Windows Update Ring targeting                         Windows client
+getTargetedUsersAndDevices                            LastBootUpTime
         │                                                    │
         └──────────── Microsoft Graph ───────────────────────┘
                               │
@@ -36,13 +36,17 @@ Windows Update Ring deviceStatuses                    Windows client
 
 ## Ring state
 
+Windows Update Ring membership is an assignment/targeting question. The collector asks Intune for the effective targeted users/devices of each discovered Windows Update Ring instead of relying on the deprecated `deviceConfigurationDeviceStatus`/`deviceStatuses` resource.
+
+Targets are correlated to the current managed-Windows inventory first by immutable `managedDevice.id`, then by Azure AD device ID. A name/UPN fallback is accepted only when it resolves to exactly one current device.
+
 Every current managed Windows device remains visible and is classified as:
 
-- **one** — exactly one update ring reports it;
-- **none** — no update-ring `deviceStatus` is currently reported;
-- **multiple** — more than one update ring reports it.
+- **one** — exactly one update ring targets it;
+- **none** — no discovered update ring targets it;
+- **multiple** — more than one update ring targets it.
 
-Ring name, raw Intune configuration status and last-report time are retained.
+Ring name and the targeting record's latest check-in time are retained. If rings exist but no targeting records can be resolved at all, collection fails rather than publishing an all-unassigned fleet.
 
 ## Weekly reboot state
 
@@ -59,6 +63,6 @@ This duplicates the observation rule of the client catch-up helper without issui
 
 ## Failure model
 
-Graph/read failures fail the collector rather than manufacturing a result. Missing or contradictory per-device signals remain explicit row states.
+Graph/read failures fail the collector rather than manufacturing a result. Missing or contradictory per-device signals remain explicit row states. The Zabbix widget derives fleet counters from the same normalized device rows it displays so aggregate cards cannot contradict the table.
 
 Browser JavaScript only filters/sorts supplied Zabbix data and performs no network access.

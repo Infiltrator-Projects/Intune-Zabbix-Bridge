@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.7 — 2026-09-04
+
+- Replaced deprecated Windows Update Ring `deviceStatuses` with Intune effective targeting membership via `getTargetedUsersAndDevices`.
+- Correlates ring targets by immutable managed-device ID or Azure AD device ID, using name/UPN only as a unique fallback.
+- Fails closed when update rings exist but no targeted Windows devices can be resolved, preventing a false all-no-ring dashboard.
+- Dashboard headline counters now derive from the same device rows displayed in the table, so counters and rows cannot contradict each other.
+- Added regressions for targeting membership, duplicate names, multi-ring membership, zero-target failure and deprecated-source exclusion.
+
 ## 0.7.6 — 2026-09-04
 
 - Release publication now mirrors the exact tested Debian package into the central Infiltrator APT repository automatically.

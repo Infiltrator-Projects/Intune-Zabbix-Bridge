@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.7 — 2026-09-04
+
+- Replaced the deprecated Windows Update Ring `deviceStatuses` runtime path with Intune's current `getTargetedUsersAndDevices` targeting action, queried separately for each discovered Windows Update Ring.
+- Ring membership is correlated to the managed Windows estate by immutable `managedDevice.id`, then Azure AD device ID, with name/UPN fallback only when it uniquely identifies one current device.
+- If update rings exist but no targeted Windows devices can be resolved, the collector now fails closed instead of publishing a misleading fleet in which every machine appears to have no ring.
+- Dashboard headline counters are derived from the same authoritative device rows rendered in the table, preventing impossible card/table contradictions such as zero no-ring devices above rows marked no ring.
+- Added regressions that forbid the deprecated ring-status source from returning to the shipped hardened collector and exercise direct ID, Azure AD ID, ambiguity, multi-ring and zero-target behavior.
+
 ## 0.7.6 — 2026-09-04
 
 - Fixed the release pipeline itself rather than relying on manual APT repair: the exact tested Intune DEB is now mirrored into `Infiltrator-Repository` as part of the release job.
