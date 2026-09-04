@@ -151,16 +151,25 @@ class CurrentRingReportTests(unittest.TestCase):
         self.assertEqual(len(reports), 1)
         self.assertEqual(reports[0].status, "succeeded")
 
-    def test_shipped_entry_point_binds_current_report_source(self):
-        old_fetch = hardened.fetch_ring_targets
-        old_parse = hardened.parse_ring_targets
-        try:
-            current.install_current_ring_source()
-            self.assertIs(hardened.fetch_ring_targets, ring_reports.fetch_ring_targets)
-            self.assertIs(hardened.parse_ring_targets, ring_reports.parse_ring_targets)
-        finally:
-            hardened.fetch_ring_targets = old_fetch
-            hardened.parse_ring_targets = old_parse
+    def test_shipped_collector_does_not_call_any_ring_graph_source(self):
+        managed = [{
+            "id": "device-a",
+            "deviceName": "PC-A",
+            "userPrincipalName": "a@example.com",
+            "operatingSystem": "Windows",
+        }]
+        with patch.object(current.legacy, "get_access_token", return_value="token"), \
+             patch.object(current.hardened, "fetch_managed_windows_devices", return_value=managed), \
+             patch.object(current.legacy, "fetch_run_states", return_value=[]), \
+             patch.object(current.legacy, "fetch_update_rings") as rings, \
+             patch.object(current.hardened, "fetch_ring_targets") as targets:
+            records, metrics = current.collect_telemetry_only(self.config())
+
+        rings.assert_not_called()
+        targets.assert_not_called()
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].ring_count, 0)
+        self.assertIn(hardened.SUMMARY_KEY, metrics)
 
 
 if __name__ == "__main__":
