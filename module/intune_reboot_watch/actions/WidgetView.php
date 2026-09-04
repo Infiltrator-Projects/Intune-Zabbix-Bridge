@@ -164,40 +164,19 @@ final class WidgetView extends CControllerDashboardWidgetView {
                 : null;
             $last_restart = (string) ($row['last_restart'] ?? '');
             $telemetry_collected = (string) ($row['telemetry_collected'] ?? '');
-            $ring_last_reported = (string) ($row['ring_last_reported'] ?? '');
-            $ring_state = (string) ($row['ring_state'] ?? 'none');
-            if (!in_array($ring_state, ['one', 'none', 'multiple'], true)) {
-                $ring_state = 'none';
-            }
-            $ring_status = trim((string) ($row['ring_status'] ?? ''));
             $reboot_state = (string) ($row['reboot_state'] ?? 'unknown');
             if (!in_array($reboot_state, ['missed', 'current', 'unknown', 'not-active'], true)) {
                 $reboot_state = 'unknown';
             }
             $reboot_due = (string) ($row['reboot_due'] ?? '');
             $reboot_priority = max(0, (int) ($row['reboot_priority'] ?? 0));
-            $ring_status_key = strtolower($ring_status);
-            $ring_fault = $ring_state !== 'one'
-                || in_array($ring_status_key, ['error', 'conflict', 'noncompliant'], true);
-            $is_fault = $ring_fault
-                || $status !== 'fresh'
+            $is_fault = $status !== 'fresh'
                 || in_array($reboot_state, ['missed', 'unknown'], true);
 
             $result[] = [
                 'rank' => $index + 1,
                 'computer_name' => (string) ($row['computer_name'] ?? ''),
                 'user' => (string) ($row['user'] ?? ''),
-                'ring_name' => (string) ($row['ring_name'] ?? ''),
-                'ring_count' => max(0, (int) ($row['ring_count'] ?? 0)),
-                'ring_state' => $ring_state,
-                'ring_state_label' => match ($ring_state) {
-                    'one' => _('One ring'),
-                    'multiple' => _('Multiple rings'),
-                    default => _('No ring reported')
-                },
-                'ring_status' => $ring_status !== '' ? $ring_status : '—',
-                'ring_last_reported' => $this->formatIsoTime($ring_last_reported),
-                'ring_last_reported_sort' => $this->isoTimestamp($ring_last_reported),
                 'reboot_state' => $reboot_state,
                 'reboot_label' => match ($reboot_state) {
                     'missed' => _('MISSED'),
