@@ -1,22 +1,57 @@
 #!/usr/bin/env python3
-"""Shipped collector entry point using the current Intune reporting framework."""
+"""Shipped collector entry point.
+
+Emergency 0.7.9 runtime: keep managed-device inventory and reboot telemetry
+publishing while Windows Update Ring collection is temporarily disabled.
+Ring-report implementation remains in the package for later re-enablement, but
+it is not called by the shipped service and therefore cannot block collection.
+"""
 
 from __future__ import annotations
 
-from typing import Any
+from datetime import datetime, timezone
 
 from . import hardened
-from . import ring_reports
+from . import collector as legacy
 
 
-def install_current_ring_source() -> None:
-    """Bind hardened fleet/reboot logic to the current update-ring report source."""
-    hardened.fetch_ring_targets = ring_reports.fetch_ring_targets  # type: ignore[assignment]
-    hardened.parse_ring_targets = ring_reports.parse_ring_targets  # type: ignore[assignment]
+def collect_telemetry_only(
+    config: legacy.Config,
+) -> tuple[list[hardened.FleetDevice], dict[str, str]]:
+    """Collect inventory + reboot telemetry without any update-ring Graph call."""
+    now = datetime.now(timezone.utc)
+    token = legacy.get_access_token(config)
+
+    managed_devices = hardened.parse_managed_windows_devices(
+        hardened.fetch_managed_windows_devices(config, token)
+    )
+    if not managed_devices:
+        raise RuntimeError(
+            "Microsoft Graph returned zero managed Windows devices; "
+            "refusing to publish an empty fleet."
+        )
+
+    raw_states = legacy.fetch_run_states(config, token)
+    telemetry_records = hardened.parse_run_states(
+        raw_states,
+        now=now,
+        max_age_hours=config.max_telemetry_age_hours,
+    )
+
+    hardened.LOG.warning(
+        "Windows Update Ring collection is temporarily disabled; "
+        "publishing managed-device inventory and reboot telemetry only."
+    )
+    records = hardened.merge_fleet_devices(
+        managed_devices,
+        [],
+        telemetry_records,
+    )
+    return records, hardened.build_metrics(records, config=config, now=now)
 
 
 def main(argv: list[str] | None = None) -> int:
-    install_current_ring_source()
+    hardened.collect = collect_telemetry_only  # type: ignore[assignment]
     return hardened.main(argv)
 
 
