@@ -73,23 +73,98 @@ jobs:
           tag="v${version}"
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; nothing to publish."
-            exit 0
+            echo "Release $tag already exists; keeping the existing release."
+          else
+            notes="$(awk -v version="$version" '
+              $0 ~ "^## " version " " { capture = 1; next }
+              capture && /^## / { exit }
+              capture { print }
+            ' CHANGELOG.md)"
+
+            if [[ -z "${notes//[[:space:]]/}" ]]; then
+              notes="Private/internal release $version."
+            fi
+
+            gh release create "$tag" \
+              dist/*.deb \
+              dist/*.run \
+              --target "$GITHUB_SHA" \
+              --title "Intune Zabbix Bridge $version" \
+              --notes "$notes"
           fi
 
-          notes="$(awk -v version="$version" '
-            $0 ~ "^## " version " " { capture = 1; next }
-            capture && /^## / { exit }
-            capture { print }
-          ' CHANGELOG.md)"
-
-          if [[ -z "${notes//[[:space:]]/}" ]]; then
-            notes="Private/internal release $version."
+      - name: Mirror tested DEB into central APT repository
+        shell: bash
+        env:
+          APT_REPOSITORY_TOKEN: ${{ secrets.APT_REPOSITORY_DISPATCH_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          if [[ -z "${APT_REPOSITORY_TOKEN:-}" ]]; then
+            echo "::error::APT_REPOSITORY_DISPATCH_TOKEN is required for Intune APT publication."
+            exit 1
           fi
 
-          gh release create "$tag" \
-            dist/*.deb \
-            dist/*.run \
-            --target "$GITHUB_SHA" \
-            --title "Intune Zabbix Bridge $version" \
-            --notes "$notes"
+          version="$(jq -r '.version' module/intune_reboot_watch/manifest.json)"
+          deb="dist/intune-zabbix-bridge_${version}_all.deb"
+          filename="$(basename "$deb")"
+          path="mirrored-packages/${filename}"
+          endpoint="repos/Infiltrator-Projects/Infiltrator-Repository/contents/${path}"
+          local_sha256="$(sha256sum "$deb" | awk '{print $1}')"
+
+          remote_json="$(GH_TOKEN="$APT_REPOSITORY_TOKEN" gh api "$endpoint?ref=main" 2>/dev/null || true)"
+          if [[ -n "$remote_json" ]]; then
+            remote_sha256="$(jq -r '.content' <<<"$remote_json" | tr -d '\n' | base64 -d | sha256sum | awk '{print $1}')"
+            if [[ "$remote_sha256" != "$local_sha256" ]]; then
+              echo "::error::Central mirror already contains ${filename} with different bytes; refusing to overwrite an immutable released version."
+              exit 1
+            fi
+            echo "Central APT mirror already contains exact ${filename} (${local_sha256})."
+          else
+            payload="$(jq -nc \
+              --arg message "Mirror Intune Zabbix Bridge ${version}" \
+              --arg content "$(base64 -w0 "$deb")" \
+              '{message:$message,content:$content,branch:"main"}')"
+            GH_TOKEN="$APT_REPOSITORY_TOKEN" gh api --method PUT "$endpoint" --input - <<<"$payload" >/dev/null
+            echo "Mirrored tested ${filename} (${local_sha256}) to central repository."
+          fi
+
+      - name: Verify public APT publication
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version="$(jq -r '.version' module/intune_reboot_watch/manifest.json)"
+          catalogue='https://infiltrator-projects.github.io/Infiltrator-Repository/catalogue/apps.json'
+          packages='https://infiltrator-projects.github.io/Infiltrator-Repository/dists/alpha/main/binary-amd64/Packages.gz'
+
+          for attempt in $(seq 1 72); do
+            catalogue_ok=false
+            packages_ok=false
+
+            if curl -fsS --retry 2 --retry-delay 1 "$catalogue?intune_release=$GITHUB_SHA&attempt=$attempt" \
+              | jq -e --arg version "$version" \
+                '.[] | select(.id == "intune-zabbix-bridge" and .version == $version)' >/dev/null; then
+              catalogue_ok=true
+            fi
+
+            if curl -fsS --retry 2 --retry-delay 1 "$packages?intune_release=$GITHUB_SHA&attempt=$attempt" \
+              | gzip -dc \
+              | awk -v version="$version" '
+                  BEGIN { RS=""; found=0 }
+                  $0 ~ /(^|\n)Package: intune-zabbix-bridge(\n|$)/ &&
+                  $0 ~ ("(^|\\n)Version: " version "(\\n|$)") { found=1 }
+                  END { exit(found ? 0 : 1) }
+                '; then
+              packages_ok=true
+            fi
+
+            if [[ "$catalogue_ok" == true && "$packages_ok" == true ]]; then
+              echo "Public APT repository advertises intune-zabbix-bridge ${version} in catalogue and Packages.gz."
+              exit 0
+            fi
+
+            echo "Waiting for APT publication of intune-zabbix-bridge ${version} ($attempt/72)..."
+            sleep 10
+          done
+
+          echo "::error::Intune release exists, but the public APT repository did not publish intune-zabbix-bridge ${version}."
+          exit 1
