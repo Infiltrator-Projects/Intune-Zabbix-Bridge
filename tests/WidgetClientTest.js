@@ -15,6 +15,9 @@ if (/\bfetch\s*\(/.test(source) || /XMLHttpRequest/.test(source)) {
 if (/\bsetInterval\s*\(|\bsetTimeout\s*\(/.test(source)) {
     throw new Error('Widget client must not create a competing refresh timer.');
 }
+if (/ring/i.test(source)) {
+    throw new Error('Telemetry-only widget client must not contain update-ring behavior.');
+}
 
 class StubWidget {}
 const context = {CWidget: StubWidget};
@@ -39,13 +42,7 @@ if (!table.matches({computer: 'LAB-PC-17', user: 'student@example.com'}, 'pc-17'
 if (!table.matches({computer: 'LAB-PC-17', user: 'Student.Name@example.com'}, 'student.name')) {
     throw new Error('Username search is not case-insensitive.');
 }
-if (!table.matches(
-    {computer: 'LAB-PC-17', user: 'student@example.com', ring: 'Update policy Students ending in Even numbers'},
-    'even numbers'
-)) {
-    throw new Error('Update-ring search failed.');
-}
-if (table.matches({computer: 'LAB-PC-17', user: 'student@example.com', ring: 'Ring A'}, 'teacher')) {
+if (table.matches({computer: 'LAB-PC-17', user: 'student@example.com'}, 'teacher')) {
     throw new Error('Unrelated search unexpectedly matched.');
 }
 if (table.compareValues('2', '10', 'number', 'asc') >= 0) {
