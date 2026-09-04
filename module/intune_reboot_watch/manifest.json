@@ -4,9 +4,9 @@
   "type": "widget",
   "name": "INTUNE — Reboot Watch",
   "namespace": "IntuneRebootWatch",
-  "version": "0.7.9",
+  "version": "0.7.10",
   "author": "Infiltrator Projects",
-  "description": "Emergency Zabbix collector mode for managed Windows inventory and reboot telemetry while update-ring Graph collection is temporarily disabled.",
+  "description": "Telemetry-only Zabbix dashboard for managed Windows inventory and reboot compliance while update-ring collection is temporarily disabled.",
   "actions": {
     "widget.intune_reboot_watch.view": {
       "class": "WidgetView"
