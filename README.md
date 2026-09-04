@@ -1,6 +1,6 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.7.8  
+**Release:** 0.7.9  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** private/internal only
 
@@ -33,13 +33,20 @@ sudo install -o root -g root -m 0600 intune-zabbix-bridge.env \
 
 The package imports it into `/etc/intune-zabbix-bridge/bridge.env`, removes the inbox copy, enables the timer and performs the first collection. Per-user Downloads folders are not trusted.
 
-Reboot Watch combines the current managed-Windows estate, Windows Update Ring policy-report state, and actual reboot telemetry. Managed-device identity is keyed by immutable Intune `managedDevice.id`; duplicate computer names are not collapsed. Reboot telemetry is joined by that ID.
+## Emergency 0.7.9 mode
 
-Ring state is read from Intune's current `deviceManagement/reports/getConfigurationPolicyDevicesReport` reporting endpoint for each Windows Update Ring. The report is parsed from its returned schema rather than fixed column positions, and `IntuneDeviceId` is joined directly to immutable `managedDevice.id`. Name/UPN matching exists only as a conservative unique fallback. Duplicate user/system report rows for the same device and ring collapse to the newest report record.
+Windows Update Ring collection is temporarily disabled in the shipped runtime. The existing Entra application does not currently have `DeviceManagementConfiguration.Read.All`; ring enumeration therefore returned HTTP 403 and aborted every 15-minute collector run.
 
-The shipped collector no longer relies on deprecated `deviceStatuses` or on inferred membership from `getTargetedUsersAndDevices`. If Intune returns rings but no usable ring report rows, collection fails closed rather than publishing a false all-unassigned fleet. Because the collector is a 15-minute oneshot, a dashboard collector age much greater than 15 minutes means recent collection attempts have failed and the displayed summary is the last successfully committed generation.
+0.7.9 deliberately makes **no update-ring Graph request**. It restores the signals that were already working before ring collection was added:
 
-The dashboard distinguishes **MISSED**, **Current**, **Unknown**, and **Not active** weekly restart states. Missing ring/telemetry signals remain visible rather than removing the machine, and fault rows are not hidden by the normal display limit or search filter. Headline counters are derived from the same authoritative device rows shown in the table, so the cards cannot contradict those rows.
+- current managed-Windows inventory keyed by immutable `managedDevice.id`;
+- reboot telemetry joined by expanded `managedDevice.id`;
+- telemetry freshness, last restart and uptime;
+- normal 15-minute Zabbix publication.
+
+The newer ring-report implementation remains packaged but dormant so it can be re-enabled later after the required Intune permission and report path are deliberately configured and tested. A regression test proves the shipped emergency runtime does not call ring enumeration or ring-report Graph sources.
+
+Because ring collection is disabled, ring and ring-dependent reboot-policy fields are not authoritative in this emergency release. Inventory and reboot telemetry remain authoritative.
 
 The Zabbix widget is read-only. Import/link the packaged `Intune Zabbix Bridge` template and create/link the `Microsoft Intune - Windows Fleet` host during setup; merely opening the dashboard never creates Zabbix objects. Trapper items in the packaged template accept submissions from `127.0.0.1` and `::1` only by default.
 
