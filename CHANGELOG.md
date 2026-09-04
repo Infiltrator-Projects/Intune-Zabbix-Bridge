@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.13 — 2026-09-04
+
+- Fixed dashboard sorting so every sortable column ranks the complete fleet before the configured row limit is applied; stale/fault rows no longer distort the visible sorted result by being pinned into it after sorting.
+- Search likewise evaluates the complete fleet first and then applies the row limit to the matching sorted rows.
+- Decoupled uptime severity from telemetry freshness: displayed uptime now uses its own thresholds (30+ days critical/red, 14+ high/red, 7+ warning/amber), while stale telemetry remains independently amber in the Telemetry column.
+- Added client and source-contract regressions for full-fleet date sorting and independent uptime severity.
+
 ## 0.7.12 — 2026-09-04
 
 - Fixed the valid-collector/invalid-dashboard failure where the full 176-device summary could exceed Zabbix's text-history storage limit and be truncated after `zabbix_sender` reported success.

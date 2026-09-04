@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.13 — 2026-09-04
+
+- Fixed dashboard sorting so every sortable column ranks the complete fleet before the configured row limit is applied; stale/fault rows no longer distort the visible sorted result by being pinned into it after sorting.
+- Search likewise evaluates the complete fleet first and then applies the row limit to the matching sorted rows.
+- Uptime colour now reflects uptime only: 30+ days is critical/red, 14+ days high/red and 7+ days warning/amber even when telemetry itself is stale; telemetry freshness keeps its own independent badge colour.
+- Added regressions for global date sorting and independent uptime severity.
+
 ## 0.7.12 — 2026-09-04
 
 - Fixed the valid-collector/invalid-dashboard failure where the full 176-device summary could exceed Zabbix's text-history storage limit and be truncated after `zabbix_sender` reported success.
@@ -37,7 +44,7 @@
 - Ring rows now join directly by the report's immutable `IntuneDeviceId`; name/UPN is only an unambiguous fallback.
 - Added schema-driven report parsing, paging for every ring and newest-row selection for duplicate device/ring report rows.
 - The packaged collector now explicitly runs through the current report-backed ring source while preserving the hardened immutable fleet/reboot logic.
-- Added regressions for report parsing, pagination, immutable identity, ambiguity, duplicate report rows and packaged entry-point selection.
+- Added regressions for report parsing, report pagination, immutable identity, ambiguity, duplicate report rows and packaged entry-point selection.
 - Fixes the collector-stale failure mode caused by unsuccessful ring discovery while retaining fail-closed behaviour when Intune genuinely returns no usable ring report rows.
 
 ## 0.7.7 — 2026-09-04

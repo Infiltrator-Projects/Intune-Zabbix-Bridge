@@ -203,13 +203,11 @@ final class WidgetView extends CControllerDashboardWidgetView {
                     'stale' => _('Stale'),
                     default => _('Missing')
                 },
-                'severity' => $status === 'missing'
+                'severity' => $uptime === null
                     ? 'missing'
-                    : ($status === 'stale'
-                        ? 'stale'
-                        : ($uptime >= 30
-                            ? 'critical'
-                            : ($uptime >= 14 ? 'high' : ($uptime >= 7 ? 'warn' : 'ok')))),
+                    : ($uptime >= 30
+                        ? 'critical'
+                        : ($uptime >= 14 ? 'high' : ($uptime >= 7 ? 'warn' : 'ok'))),
                 'is_fault' => $is_fault
             ];
         }

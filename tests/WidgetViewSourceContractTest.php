@@ -12,7 +12,8 @@ foreach ([
     'WidgetForm',
     'API::History()->get',
     'intune.windows.summary.json',
-    "'is_fault'"
+    "'is_fault'",
+    "'severity' => \$uptime === null"
 ] as $symbol) {
     if (strpos($source, $symbol) === false) {
         fwrite(STDERR, "FAIL: WidgetView no longer references {$symbol}.\n");
@@ -24,10 +25,11 @@ foreach ([
     'ensureFleetDataModel',
     'API::HostGroup()->create',
     'API::Host()->create',
-    'API::Item()->create'
+    'API::Item()->create',
+    "\$status === 'stale'\n                    ? 'stale'"
 ] as $forbidden) {
     if (strpos($source, $forbidden) !== false) {
-        fwrite(STDERR, "FAIL: dashboard rendering regained provisioning side effect {$forbidden}.\n");
+        fwrite(STDERR, "FAIL: dashboard rendering contains forbidden behavior {$forbidden}.\n");
         exit(1);
     }
 }

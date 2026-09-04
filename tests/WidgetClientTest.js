@@ -60,4 +60,37 @@ if (table.compareValues('', 'named-user', 'text', 'desc') <= 0) {
     throw new Error('Blank values must remain last.');
 }
 
+function stubRow(rank, computer, user, sortValues) {
+    return {
+        dataset: {
+            sortRank: String(rank),
+            computerName: computer,
+            user
+        },
+        getAttribute(name) {
+            return sortValues[name.replace('data-sort-', '')] ?? '';
+        }
+    };
+}
+
+const fleet = Array.from({length: 20}, (_, index) => stubRow(
+    index + 1,
+    `PC-${index + 1}`,
+    `user-${index + 1}@example.com`,
+    {'last-restart': index + 1, uptime: index + 1}
+));
+const sortedFleet = table.sortRows(fleet, 'last-restart', 'number', 'desc');
+const firstPage = table.filterRows(sortedFleet, '').slice(0, 10);
+
+if (firstPage.length !== 10
+        || firstPage[0].dataset.computerName !== 'PC-20'
+        || firstPage[9].dataset.computerName !== 'PC-11') {
+    throw new Error('Sort must rank the complete fleet before applying the display limit.');
+}
+
+const searched = table.filterRows(sortedFleet, 'PC-3');
+if (searched.length !== 1 || searched[0].dataset.computerName !== 'PC-3') {
+    throw new Error('Search must evaluate the complete fleet rather than only visible rows.');
+}
+
 console.log('WidgetClientTest: all assertions passed.');

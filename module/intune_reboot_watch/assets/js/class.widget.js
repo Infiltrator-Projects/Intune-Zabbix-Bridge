@@ -39,15 +39,39 @@ const IntuneRebootWatchTable = Object.freeze({
         }
 
         return direction === 'desc' ? -result : result;
+    },
+
+    sortRows(rows, key, type, direction) {
+        return [...rows].sort((left, right) => {
+            const comparison = this.compareValues(
+                left.getAttribute(`data-sort-${key}`),
+                right.getAttribute(`data-sort-${key}`),
+                type,
+                direction
+            );
+
+            return comparison !== 0
+                ? comparison
+                : Number(left.dataset.sortRank) - Number(right.dataset.sortRank);
+        });
+    },
+
+    filterRows(rows, query) {
+        return [...rows].filter(row => this.matches(
+            {
+                computer: row.dataset.computerName,
+                user: row.dataset.user
+            },
+            query
+        ));
     }
 });
 
 /**
  * INTUNE — Reboot Watch client controller.
  *
- * Zabbix owns refresh scheduling. Fault rows are operational exceptions and are
- * never hidden by the cosmetic row limit or by a search term; search only limits
- * the additional non-fault rows shown alongside them.
+ * Zabbix owns refresh scheduling. Search and sort always operate on the complete
+ * fleet payload first; the configured display limit is applied only afterwards.
  */
 class WidgetIntuneRebootWatch extends CWidget {
 
@@ -99,13 +123,6 @@ class WidgetIntuneRebootWatch extends CWidget {
         this.#applyTable(root);
     }
 
-    #isFault(row) {
-        return row.classList.contains('is-missing')
-            || row.classList.contains('is-stale')
-            || row.classList.contains('is-reboot-missed')
-            || row.classList.contains('is-reboot-unknown');
-    }
-
     #applyTable(root) {
         const table = root.querySelector('.irw-table');
         const body = table?.tBodies[0];
@@ -121,28 +138,8 @@ class WidgetIntuneRebootWatch extends CWidget {
         }
 
         const query = IntuneRebootWatchTable.normaliseSearch(this._irw_search);
-        const searchMatches = new Set(rows.filter(row => IntuneRebootWatchTable.matches(
-            {
-                computer: row.dataset.computerName,
-                user: row.dataset.user
-            },
-            query
-        )));
-        const faultRows = new Set(rows.filter(row => this.#isFault(row)));
         const {key, type, direction} = this._irw_sort;
-
-        const sorted = [...rows].sort((left, right) => {
-            const comparison = IntuneRebootWatchTable.compareValues(
-                left.getAttribute(`data-sort-${key}`),
-                right.getAttribute(`data-sort-${key}`),
-                type,
-                direction
-            );
-
-            return comparison !== 0
-                ? comparison
-                : Number(left.dataset.sortRank) - Number(right.dataset.sortRank);
-        });
+        const sorted = IntuneRebootWatchTable.sortRows(rows, key, type, direction);
 
         for (const row of rows) {
             row.hidden = true;
@@ -152,21 +149,9 @@ class WidgetIntuneRebootWatch extends CWidget {
         }
 
         const row_limit = Math.max(1, Number(root.dataset.rowLimit) || 10);
-        const visibleSet = new Set(faultRows);
+        const matchingRows = IntuneRebootWatchTable.filterRows(sorted, query);
+        const visible = matchingRows.slice(0, row_limit);
 
-        // Fill ordinary rows only until the normal display limit is reached.
-        // Fault rows are already present and are never sacrificed to that limit.
-        for (const row of sorted) {
-            if (!searchMatches.has(row) || visibleSet.has(row)) {
-                continue;
-            }
-            if (visibleSet.size >= row_limit) {
-                break;
-            }
-            visibleSet.add(row);
-        }
-
-        const visible = sorted.filter(row => visibleSet.has(row));
         visible.forEach((row, index) => {
             row.hidden = false;
 
@@ -201,7 +186,7 @@ class WidgetIntuneRebootWatch extends CWidget {
         if (count !== null) {
             count.textContent = query === ''
                 ? `${visible.length} / ${rows.length}`
-                : `${visible.length} shown · ${searchMatches.size} matches · ${rows.length} total`;
+                : `${visible.length} shown · ${matchingRows.length} matches · ${rows.length} total`;
         }
 
         for (const button of table.querySelectorAll('.irw-sort')) {

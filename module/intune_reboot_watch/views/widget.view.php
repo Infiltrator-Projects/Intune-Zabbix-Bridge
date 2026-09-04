@@ -201,7 +201,7 @@ $footer = (new CDiv([
         .' '.(string) $summary['weekly_restart_time']
         .' · policy start '.(string) $summary['weekly_restart_policy_start']
     )),
-    (new CSpan(_('Reboot/telemetry faults are never hidden.'))),
+    (new CSpan(_('Sort/search use the complete fleet before the display limit.'))),
     (new CSpan(_('Zabbix received: ').(string) $data['received_at']))
 ]))->addClass('irw-footer');
 
