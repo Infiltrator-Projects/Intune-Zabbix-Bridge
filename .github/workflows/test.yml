@@ -15,14 +15,18 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
       - name: Install test dependencies
         run: sudo apt-get update && sudo apt-get install -y jq php-cli nodejs
+
       - name: Run project tests
         run: ./tools/test.sh
+
       - name: Build private artifacts
         run: |
           ./tools/build-installer.sh
           ./tools/build-deb.sh
+
       - name: Inspect artifacts
         shell: bash
         run: |
@@ -38,6 +42,7 @@ jobs:
           test -f "$extract/usr/lib/systemd/system/intune-zabbix-bridge-import.path"
           test ! -e "$extract/etc/intune-zabbix-bridge/bridge.env"
           test -f "$extract/usr/share/doc/intune-zabbix-bridge/intune-zabbix-bridge.env.example"
+
       - name: Upload private build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -99,61 +104,6 @@ jobs:
               --notes "$notes"
           fi
 
-      - name: Mirror exact tested DEB into central APT repository
-        shell: bash
-        env:
-          APT_TOKEN: ${{ secrets.APT_REPOSITORY_DISPATCH_TOKEN }}
-          APT_REPO: Infiltrator-Projects/Infiltrator-Repository
-        run: |
-          set -Eeuo pipefail
-          if [[ -z "${APT_TOKEN:-}" ]]; then
-            echo "::error::APT_REPOSITORY_DISPATCH_TOKEN is required to mirror the private release into the public APT repository."
-            exit 1
-          fi
-
-          version="$(jq -r '.version' module/intune_reboot_watch/manifest.json)"
-          deb="dist/intune-zabbix-bridge_${version}_all.deb"
-          filename="$(basename "$deb")"
-          path="mirrored-packages/$filename"
-          expected_sha256="$(sha256sum "$deb" | awk '{print $1}')"
-
-          test "$(dpkg-deb --field "$deb" Package)" = intune-zabbix-bridge
-          test "$(dpkg-deb --field "$deb" Version)" = "$version"
-          test "$(dpkg-deb --field "$deb" Architecture)" = all
-
-          existing_blob_sha="$(GH_TOKEN="$APT_TOKEN" gh api \
-            "repos/$APT_REPO/contents/$path?ref=main" --jq '.sha' 2>/dev/null || true)"
-
-          if [[ -n "$existing_blob_sha" ]]; then
-            tmp="$(mktemp)"
-            GH_TOKEN="$APT_TOKEN" gh api \
-              "repos/$APT_REPO/contents/$path?ref=main" --jq '.content' \
-              | tr -d '\n' | base64 -d > "$tmp"
-            actual_sha256="$(sha256sum "$tmp" | awk '{print $1}')"
-            rm -f "$tmp"
-
-            if [[ "$actual_sha256" != "$expected_sha256" ]]; then
-              echo "::error::Central mirror already contains $filename with different bytes; refusing to overwrite an immutable release."
-              exit 1
-            fi
-            echo "Central mirror already contains the exact tested $filename."
-          else
-            content="$(base64 -w0 "$deb")"
-            GH_TOKEN="$APT_TOKEN" gh api --method PUT \
-              "repos/$APT_REPO/contents/$path" \
-              -f message="Mirror Intune Zabbix Bridge $version" \
-              -f content="$content" \
-              -f branch=main >/dev/null
-            echo "Mirrored exact tested $filename into $APT_REPO."
-          fi
-
-          payload="$(jq -nc --arg repository "$GITHUB_REPOSITORY" --arg sha "$GITHUB_SHA" \
-            '{event_type:"application-release",client_payload:{repository:$repository,sha:$sha}}')"
-          if ! GH_TOKEN="$APT_TOKEN" gh api --method POST \
-            "repos/$APT_REPO/dispatches" --input - <<<"$payload"; then
-            echo "::warning::Immediate central APT dispatch failed; the central repository push/scheduled refresh remains the safety net."
-          fi
-
       - name: Verify central APT publication
         shell: bash
         run: |
@@ -162,7 +112,10 @@ jobs:
           catalogue='https://infiltrator-projects.github.io/Infiltrator-Repository/catalogue/apps.json'
           packages='https://infiltrator-projects.github.io/Infiltrator-Repository/dists/alpha/main/binary-amd64/Packages.gz'
 
-          for attempt in $(seq 1 72); do
+          echo 'The central repository pulls the latest private Intune release on its own schedule.'
+          echo "Waiting for that pull and public APT publication of intune-zabbix-bridge ${version}."
+
+          for attempt in $(seq 1 180); do
             catalogue_ok=false
             packages_ok=false
 
@@ -188,9 +141,9 @@ jobs:
               exit 0
             fi
 
-            echo "Waiting for central APT publication of intune-zabbix-bridge ${version} ($attempt/72)..."
+            echo "Waiting for central APT publication of intune-zabbix-bridge ${version} ($attempt/180)..."
             sleep 10
           done
 
-          echo "::error::Private release exists, but the public APT repository did not publish intune-zabbix-bridge ${version}."
+          echo "::error::Private release exists, but the central pull did not publish intune-zabbix-bridge ${version} within 30 minutes."
           exit 1
