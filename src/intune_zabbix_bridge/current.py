@@ -12,6 +12,7 @@ already-linked Zabbix template cannot block the whole generation.
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from datetime import datetime, timezone
 
@@ -33,6 +34,28 @@ _BASELINE_ZABBIX_KEYS = frozenset({
     hardened.SUMMARY_KEY,
 })
 
+# Zabbix 7 text history values are capped at 65,536 bytes on the supported
+# database backends. Keep a little headroom so the database can never truncate
+# the summary into invalid JSON while it is being used as the generation commit
+# marker.
+_ZABBIX_TEXT_SAFE_BYTES = 64_000
+
+# The installed widget needs only these per-device fields in telemetry-only
+# mode. FleetSummary deliberately supplies defaults for the omitted dormant ring
+# fields and accepts ``fresh`` as the legacy source for telemetry_status.
+_COMPACT_DEVICE_FIELDS = (
+    "computer_name",
+    "user",
+    "last_restart",
+    "telemetry_collected",
+    "uptime_days",
+    "telemetry_age_hours",
+    "fresh",
+    "reboot_state",
+    "reboot_priority",
+    "reboot_due",
+)
+
 
 def evaluate_reboot_telemetry_only(
     record: hardened.FleetDevice,
@@ -52,6 +75,65 @@ def evaluate_reboot_telemetry_only(
         config=config,
         now=now,
     )
+
+
+def _compact_summary_metric(metrics: dict[str, str]) -> dict[str, str]:
+    """Remove dormant/redundant row fields before the summary reaches Zabbix.
+
+    Zabbix accepts an oversized text trapper value and then truncates it at the
+    database text limit. Because the summary is JSON, such truncation turns a
+    successful collector run into an unreadable dashboard generation. The
+    telemetry-only widget does not consume managed-device identity or ring
+    fields, and it uses the complete ``devices`` list rather than the redundant
+    ``top`` copy, so remove those transport-only bytes without changing what the
+    user sees.
+    """
+    raw = metrics.get(hardened.SUMMARY_KEY)
+    if raw is None:
+        raise RuntimeError("summary metric is missing from generated metrics")
+
+    try:
+        summary = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("generated summary is not valid JSON") from exc
+
+    if not isinstance(summary, dict):
+        raise RuntimeError("generated summary is not a JSON object")
+    devices = summary.get("devices")
+    if not isinstance(devices, list):
+        raise RuntimeError("generated summary has no device list")
+
+    compact_devices: list[dict[str, object]] = []
+    for index, candidate in enumerate(devices):
+        if not isinstance(candidate, dict):
+            raise RuntimeError(f"generated summary device {index} is not an object")
+        computer_name = str(candidate.get("computer_name") or "").strip()
+        if not computer_name:
+            raise RuntimeError(f"generated summary device {index} has no computer name")
+
+        compact_devices.append({
+            field: candidate.get(field)
+            for field in _COMPACT_DEVICE_FIELDS
+            if field in candidate
+        })
+
+    summary["devices"] = compact_devices
+    # FleetSummary always prefers the complete devices list. Keeping a second
+    # top-ten copy wastes several kilobytes of the fixed Zabbix text budget.
+    summary.pop("top", None)
+
+    compact = json.dumps(summary, separators=(",", ":"), ensure_ascii=False)
+    size = len(compact.encode("utf-8"))
+    if size > _ZABBIX_TEXT_SAFE_BYTES:
+        raise RuntimeError(
+            "fleet summary is too large for safe Zabbix text storage "
+            f"({size} bytes > {_ZABBIX_TEXT_SAFE_BYTES}); refusing to publish "
+            "a truncated generation"
+        )
+
+    updated = dict(metrics)
+    updated[hardened.SUMMARY_KEY] = compact
+    return updated
 
 
 def baseline_zabbix_metrics(metrics: dict[str, str]) -> dict[str, str]:
@@ -96,7 +178,7 @@ def collect_telemetry_only(
 
     # Recreate the pre-inventory-expansion population: devices with actual
     # remediation telemetry are the dashboard population. Immutable Intune IDs
-    # are still retained so duplicate computer names remain distinct.
+    # are still retained internally so duplicate computer names remain distinct.
     managed_devices = [
         hardened.ManagedDevice(
             managed_device_id=record.managed_device_id,
@@ -116,6 +198,7 @@ def collect_telemetry_only(
         telemetry_records,
     )
     metrics = hardened.build_metrics(records, config=config, now=now)
+    metrics = _compact_summary_metric(metrics)
     return records, baseline_zabbix_metrics(metrics)
 
 
