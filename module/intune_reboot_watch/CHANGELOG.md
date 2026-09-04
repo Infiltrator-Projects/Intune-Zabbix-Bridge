@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.11 — 2026-09-04
+
+- Restored the proven remediation-telemetry population used by the working collector instead of expanding Reboot Watch to every managed Windows inventory record.
+- Kept immutable `managedDevice.id` identity for reporting devices while leaving Windows Update Ring Graph collection disabled.
+- Publish only the original long-standing Zabbix companion trapper keys plus the summary JSON; optional ring/reboot companion keys can no longer make an older deployed template reject the generation before the summary commit marker is sent.
+- Reboot and telemetry counters used by the widget remain authoritative inside the summary JSON.
+- Added regressions for the restored operational population, backward-compatible publication key set and zero-telemetry fail-closed behaviour.
+
 ## 0.7.10 — 2026-09-04
 
 - Removed update-ring cards, columns, search terms and ring fault styling from the shipped Reboot Watch widget while ring collection is disabled.
