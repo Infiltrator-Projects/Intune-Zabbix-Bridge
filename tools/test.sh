@@ -82,14 +82,14 @@ if command -v dpkg-deb >/dev/null 2>&1; then
 fi
 
 echo "[14/14] Release and APT publication contracts"
-! grep -Fq 'APT_REPOSITORY_DISPATCH_TOKEN' "$RELEASE_WORKFLOW" || { echo 'ERROR: Intune release must not depend on a cross-repository APT secret.' >&2; exit 1; }
-grep -Fq 'actions/configure-pages@v5' "$RELEASE_WORKFLOW"
-grep -Fq 'actions/upload-pages-artifact@v3' "$RELEASE_WORKFLOW"
-grep -Fq 'actions/deploy-pages@v4' "$RELEASE_WORKFLOW"
-grep -Fq 'apt-export/manifest.json' "$RELEASE_WORKFLOW"
-grep -Fq 'Public credential-free APT export is live for intune-zabbix-bridge ${version}.' "$RELEASE_WORKFLOW"
+grep -Fq 'APT_REPOSITORY_DISPATCH_TOKEN' "$RELEASE_WORKFLOW" || { echo 'ERROR: private Intune release must have an authenticated central APT handoff.' >&2; exit 1; }
+grep -Fq 'Mirror exact tested DEB into central APT repository' "$RELEASE_WORKFLOW"
+grep -Fq 'mirrored-packages/$filename' "$RELEASE_WORKFLOW"
+grep -Fq 'gh api --method PUT' "$RELEASE_WORKFLOW"
+grep -Fq 'different bytes; refusing to overwrite an immutable release' "$RELEASE_WORKFLOW"
 grep -Fq 'dists/alpha/main/binary-amd64/Packages.gz' "$RELEASE_WORKFLOW"
 grep -Fq 'Public APT repository advertises intune-zabbix-bridge ${version} in catalogue and Packages.gz.' "$RELEASE_WORKFLOW"
+! grep -Fq 'actions/configure-pages@v5' "$RELEASE_WORKFLOW" || { echo 'ERROR: private Intune release must not rely on GitHub Pages in the private source repository.' >&2; exit 1; }
 if grep -R -F "$VERSION" "$ROOT/tools" "$ROOT/.github" >/dev/null; then
     echo "ERROR: current release version is hard-coded in tools or CI." >&2
     grep -R -n -F "$VERSION" "$ROOT/tools" "$ROOT/.github" >&2 || true
