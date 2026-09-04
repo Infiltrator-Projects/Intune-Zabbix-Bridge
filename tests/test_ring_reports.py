@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from intune_zabbix_bridge import current, hardened, ring_reports
@@ -170,6 +171,33 @@ class CurrentRingReportTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].ring_count, 0)
         self.assertIn(hardened.SUMMARY_KEY, metrics)
+
+    def test_telemetry_only_reboot_state_does_not_require_ring(self):
+        config = self.config()
+        config = Config(
+            **{**config.__dict__, "weekly_restart_policy_start": "2026-08-30T03:00:00"}
+        )
+        record = hardened.FleetDevice(
+            managed_device_id="device-a",
+            computer_name="PC-A",
+            user="a@example.com",
+            ring_names=(),
+            ring_count=0,
+            ring_state="none",
+            ring_status="not-targeted",
+            ring_last_reported=None,
+            last_restart=datetime(2026, 9, 3, 1, 0, tzinfo=timezone.utc),
+            telemetry_collected=datetime(2026, 9, 4, 1, 0, tzinfo=timezone.utc),
+            uptime_days=1.0,
+            telemetry_age_hours=0.0,
+            telemetry_status="fresh",
+        )
+        result = current.evaluate_reboot_telemetry_only(
+            record,
+            config=config,
+            now=datetime(2026, 9, 4, 2, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(result.state, "current")
 
 
 if __name__ == "__main__":
