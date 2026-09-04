@@ -4,9 +4,9 @@
   "type": "widget",
   "name": "INTUNE — Reboot Watch",
   "namespace": "IntuneRebootWatch",
-  "version": "0.7.11",
+  "version": "0.7.12",
   "author": "Infiltrator Projects",
-  "description": "Telemetry-only Zabbix dashboard for reboot compliance while update-ring collection is temporarily disabled.",
+  "description": "Telemetry-only Zabbix dashboard with Zabbix-safe compact fleet summaries while update-ring collection is temporarily disabled.",
   "actions": {
     "widget.intune_reboot_watch.view": {
       "class": "WidgetView"
