@@ -3,6 +3,7 @@ set -Eeuo pipefail
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly MODULE="$ROOT/module/intune_reboot_watch"
 readonly MANIFEST="$MODULE/manifest.json"
+readonly RELEASE_WORKFLOW="$ROOT/.github/workflows/test.yml"
 
 for cmd in jq php node python3 bash grep awk stat; do command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing test command: $cmd" >&2; exit 1; }; done
 readonly VERSION="$(jq -r '.version // empty' "$MANIFEST")"
@@ -75,7 +76,12 @@ if command -v dpkg-deb >/dev/null 2>&1; then
     [[ -f "$extract/usr/share/doc/intune-zabbix-bridge/intune-zabbix-bridge.env.example" ]]
 fi
 
-echo "[14/14] Release-version drift"
+echo "[14/14] Release and APT publication contracts"
+grep -Fq 'APT_REPOSITORY_DISPATCH_TOKEN' "$RELEASE_WORKFLOW"
+grep -Fq 'path="mirrored-packages/${filename}"' "$RELEASE_WORKFLOW"
+grep -Fq 'Central mirror already contains exact ${filename}' "$RELEASE_WORKFLOW"
+grep -Fq 'dists/alpha/main/binary-amd64/Packages.gz' "$RELEASE_WORKFLOW"
+grep -Fq 'Public APT repository advertises intune-zabbix-bridge ${version} in catalogue and Packages.gz.' "$RELEASE_WORKFLOW"
 if grep -R -F "$VERSION" "$ROOT/tools" "$ROOT/.github" >/dev/null; then
     echo "ERROR: current release version is hard-coded in tools or CI." >&2
     grep -R -n -F "$VERSION" "$ROOT/tools" "$ROOT/.github" >&2 || true
