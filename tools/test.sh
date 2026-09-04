@@ -4,6 +4,7 @@ readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly MODULE="$ROOT/module/intune_reboot_watch"
 readonly MANIFEST="$MODULE/manifest.json"
 readonly RELEASE_WORKFLOW="$ROOT/.github/workflows/test.yml"
+readonly HARDENED_COLLECTOR="$ROOT/src/intune_zabbix_bridge/hardened.py"
 
 for cmd in jq php node python3 bash grep awk stat; do command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing test command: $cmd" >&2; exit 1; }; done
 readonly VERSION="$(jq -r '.version // empty' "$MANIFEST")"
@@ -35,12 +36,16 @@ echo "[10/14] Shell/Python setup syntax"
 while IFS= read -r -d '' file; do bash -n "$file"; done < <(find "$ROOT/tools" -type f -name '*.sh' -print0)
 python3 -m py_compile "$ROOT/packaging/linux/import-config"
 
-echo "[11/14] Security boundary contracts"
+echo "[11/14] Security and data-source boundary contracts"
 grep -Fq 'PathExists=/etc/intune-zabbix-bridge/import/intune-zabbix-bridge.env' "$ROOT/packaging/debian/intune-zabbix-bridge-import.path"
 ! grep -Rq '/home/.*Downloads\|/home/\*/Downloads' "$ROOT/packaging" || { echo 'ERROR: unsafe per-user Downloads config watcher returned.' >&2; exit 1; }
 grep -Fq 'SOURCE = Path("/etc/intune-zabbix-bridge/import/intune-zabbix-bridge.env")' "$ROOT/packaging/linux/import-config"
 grep -Fq 'stat.st_uid != 0' "$ROOT/packaging/linux/import-config"
 grep -Fq 'stat.st_mode & 0o022' "$ROOT/packaging/linux/import-config"
+grep -Fq 'getTargetedUsersAndDevices' "$HARDENED_COLLECTOR" || { echo 'ERROR: current update-ring targeting source is missing.' >&2; exit 1; }
+! grep -Fq 'fetch_ring_device_statuses' "$HARDENED_COLLECTOR" || { echo 'ERROR: deprecated deviceStatuses ring path returned to shipped collector.' >&2; exit 1; }
+! grep -Fq 'deviceConfigurationStates' "$HARDENED_COLLECTOR" || { echo 'ERROR: deprecated per-device configuration-state path returned to shipped collector.' >&2; exit 1; }
+grep -Fq 'refusing to publish a misleading all-unassigned fleet' "$HARDENED_COLLECTOR"
 trap_count="$(grep -c '^[[:space:]]*type: TRAP$' "$ROOT/zabbix/template_intune_zabbix_bridge.yaml")"
 allowed_count="$(grep -c "^[[:space:]]*allowed_hosts: '127.0.0.1,::1'$" "$ROOT/zabbix/template_intune_zabbix_bridge.yaml")"
 [[ "$trap_count" -gt 0 && "$allowed_count" -eq "$trap_count" ]] || { echo 'ERROR: every trapper item must restrict allowed_hosts.' >&2; exit 1; }
