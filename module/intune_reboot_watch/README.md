@@ -1,30 +1,21 @@
 # INTUNE — Reboot Watch
 
-**Release:** 0.7.8  
+**Release:** 0.7.9  
 **Platform:** Zabbix 7.0 LTS
 
-Reboot Watch has one operational job: show the Windows machines covered by Intune update policy and tell us whether they have satisfied the required weekly restart.
+Reboot Watch is temporarily running in **inventory + reboot telemetry only** mode.
 
-It keeps three independent signals visible:
+The shipped 0.7.9 collector does not make any Windows Update Ring Graph request. This emergency mode was introduced because the existing Entra application does not currently have `DeviceManagementConfiguration.Read.All`; ring enumeration was therefore returning HTTP 403 and aborting every 15-minute collector run.
+
+0.7.9 restores the operational signals that were already working:
 
 - current Intune managed-Windows inventory, keyed by immutable `managedDevice.id`;
-- Windows Update Ring device policy state from Intune's current `getConfigurationPolicyDevicesReport` report;
-- `Windows - Reboot Telemetry`, joined to the fleet by expanded `managedDevice.id` and containing the actual Windows `LastBootUpTime`.
+- `Windows - Reboot Telemetry`, joined by expanded `managedDevice.id` and containing the actual Windows `LastBootUpTime`;
+- normal 15-minute publication to Zabbix.
 
-Ring report rows are correlated primarily by the report's `IntuneDeviceId`, which maps directly to immutable `managedDevice.id`. Name/UPN matching is only a conservative fallback when it uniquely identifies one current device. Duplicate computer names therefore remain separate and are never silently merged. Duplicate report rows for the same device/ring collapse to the newest report time.
+The ring-report implementation remains in the package but is dormant. It will be re-enabled only after the required Intune permission and report path are deliberately configured and tested. The shipped runtime has a regression test proving it does not call update-ring enumeration or ring-report Graph endpoints.
 
-The shipped collector does not use deprecated Windows Update Ring `deviceStatuses` and no longer infers ring membership from `getTargetedUsersAndDevices`. If Intune returns update rings but no usable ring report rows, collection fails instead of publishing a false all-no-ring fleet. The collector runs every 15 minutes, so a substantially older collector age means the dashboard is showing the last successful generation while newer collector attempts are failing.
-
-The weekly requirement is evaluated from the real boot time against the configured weekly restart boundary. The St Augustine's defaults mirror the deployed catch-up policy: **Sunday 03:00**, first active occurrence **06/09/2026 03:00 Australia/Melbourne**.
-
-Per-device reboot state is:
-
-- **MISSED** — exactly one ring reports for the device, telemetry is fresh, and last boot is before the applicable weekly restart;
-- **Current** — exactly one ring reports for the device and last boot is at or after the applicable weekly restart;
-- **Unknown** — the policy is active but ring state or reboot telemetry is not trustworthy enough to decide;
-- **Not active** — the first configured weekly restart has not happened yet.
-
-Missing ring or telemetry data never makes a computer disappear. Operational fault rows are always kept visible even when the normal row limit is exceeded or a search would otherwise hide them. Headline counters are recalculated from those same device rows, so the cards cannot contradict the table.
+Because ring collection is disabled, ring/reboot-policy fields must not be treated as authoritative in this emergency release. Device inventory, telemetry freshness, last restart and uptime remain authoritative.
 
 The widget is read-only and never provisions hosts, groups or items while rendering. Import/link the packaged Zabbix template during setup. Its trapper items accept local submissions only by default.
 
