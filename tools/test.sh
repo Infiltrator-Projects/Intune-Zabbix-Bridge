@@ -79,7 +79,7 @@ fi
 echo "[14/14] Release and APT publication contracts"
 grep -Fq 'APT_REPOSITORY_DISPATCH_TOKEN' "$RELEASE_WORKFLOW"
 grep -Fq 'path="mirrored-packages/${filename}"' "$RELEASE_WORKFLOW"
-grep -Fq 'Central mirror already contains exact ${filename}' "$RELEASE_WORKFLOW"
+grep -Fq 'Central APT mirror already contains exact ${filename}' "$RELEASE_WORKFLOW"
 grep -Fq 'dists/alpha/main/binary-amd64/Packages.gz' "$RELEASE_WORKFLOW"
 grep -Fq 'Public APT repository advertises intune-zabbix-bridge ${version} in catalogue and Packages.gz.' "$RELEASE_WORKFLOW"
 if grep -R -F "$VERSION" "$ROOT/tools" "$ROOT/.github" >/dev/null; then
