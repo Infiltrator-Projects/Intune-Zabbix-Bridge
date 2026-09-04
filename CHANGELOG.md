@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.10 — 2026-09-04
+
+- Removed update-ring cards, columns, search terms and ring fault styling from the shipped Reboot Watch widget while ring collection is disabled.
+- Weekly reboot compliance now evaluates from fresh reboot telemetry alone in telemetry-only mode instead of forcing every zero-ring device to Unknown.
+- The shipped collector still makes no update-ring Graph calls, so `DeviceManagementConfiguration.Read.All` is not required for normal inventory/reboot collection.
+- Kept the dormant ring-report implementation packaged for later deliberate re-enablement, but it is no longer part of the operational UI or runtime decision path.
+- Added regression coverage for telemetry-only reboot evaluation and for the ring-free widget client.
+
+## 0.7.9 — 2026-09-04
+
+- Temporarily removed Windows Update Ring collection from the shipped runtime so a missing `DeviceManagementConfiguration.Read.All` permission cannot stop the collector.
+- The service publishes managed-Windows inventory and reboot telemetry without making any update-ring Graph request.
+- The ring-report implementation remains packaged but dormant for later re-enablement after permissions are deliberately configured and tested.
+- Added a regression proving the shipped runtime does not call ring enumeration or ring-report Graph sources.
+
 ## 0.7.8 — 2026-09-04
 
 - Replaced the `getTargetedUsersAndDevices` ring-membership inference introduced in 0.7.7 with Intune's current `getConfigurationPolicyDevicesReport` device policy report.
