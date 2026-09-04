@@ -31,6 +31,7 @@ jobs:
           deb="dist/intune-zabbix-bridge_${version}_all.deb"
           test "$(dpkg-deb --field "$deb" Version)" = "$version"
           test "$(dpkg-deb --field "$deb" Package)" = intune-zabbix-bridge
+          test "$(dpkg-deb --field "$deb" Architecture)" = all
           extract="$(mktemp -d)"
           dpkg-deb -x "$deb" "$extract"
           test -x "$extract/usr/lib/intune-zabbix-bridge/import-config"
@@ -54,6 +55,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages-deployment.outputs.page_url }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -98,98 +104,148 @@ jobs:
               --notes "$notes"
           fi
 
-      - name: Mirror exact tested DEB into central APT repository
+      - name: Build public APT handoff from exact tested DEB
+        id: handoff
         shell: bash
-        env:
-          APT_TOKEN: ${{ secrets.APT_REPOSITORY_DISPATCH_TOKEN }}
-          APT_REPO: Infiltrator-Projects/Infiltrator-Repository
         run: |
           set -Eeuo pipefail
-          if [[ -z "${APT_TOKEN:-}" ]]; then
-            echo "::error::APT_REPOSITORY_DISPATCH_TOKEN is required to mirror the private release into the public APT repository."
-            exit 1
-          fi
-
           version="$(jq -r '.version' module/intune_reboot_watch/manifest.json)"
           deb="dist/intune-zabbix-bridge_${version}_all.deb"
           filename="$(basename "$deb")"
-          path="mirrored-packages/$filename"
-          expected_sha256="$(sha256sum "$deb" | awk '{print $1}')"
+          sha256="$(sha256sum "$deb" | awk '{print $1}')"
 
           test "$(dpkg-deb --field "$deb" Package)" = intune-zabbix-bridge
           test "$(dpkg-deb --field "$deb" Version)" = "$version"
           test "$(dpkg-deb --field "$deb" Architecture)" = all
 
-          existing_blob_sha="$(GH_TOKEN="$APT_TOKEN" gh api \
-            "repos/$APT_REPO/contents/$path?ref=main" --jq '.sha' 2>/dev/null || true)"
+          rm -rf apt-handoff
+          mkdir -p apt-handoff
+          install -m 0644 "$deb" "apt-handoff/$filename"
+          : > apt-handoff/.nojekyll
+          jq -n \
+            --arg package 'intune-zabbix-bridge' \
+            --arg version "$version" \
+            --arg filename "$filename" \
+            --arg sha256 "$sha256" \
+            --arg source_sha "$GITHUB_SHA" \
+            '{package:$package,version:$version,filename:$filename,sha256:$sha256,source_sha:$source_sha}' \
+            > apt-handoff/manifest.json
 
-          if [[ -n "$existing_blob_sha" ]]; then
-            tmp="$(mktemp)"
-            GH_TOKEN="$APT_TOKEN" gh api \
-              "repos/$APT_REPO/contents/$path?ref=main" --jq '.content' \
-              | tr -d '\n' | base64 -d > "$tmp"
-            actual_sha256="$(sha256sum "$tmp" | awk '{print $1}')"
-            rm -f "$tmp"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "Prepared public APT handoff for $filename ($sha256)."
 
-            if [[ "$actual_sha256" != "$expected_sha256" ]]; then
-              echo "::error::Central mirror already contains $filename with different bytes; refusing to overwrite an immutable release."
-              exit 1
+      - name: Configure Pages handoff
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages handoff artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: intune-apt-handoff-${{ github.run_attempt }}
+          path: apt-handoff
+
+      - name: Deploy public APT handoff
+        id: pages-deployment
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: intune-apt-handoff-${{ github.run_attempt }}
+
+      - name: Verify public APT handoff bytes
+        shell: bash
+        env:
+          VERSION: ${{ steps.handoff.outputs.version }}
+          FILENAME: ${{ steps.handoff.outputs.filename }}
+          EXPECTED_SHA256: ${{ steps.handoff.outputs.sha256 }}
+        run: |
+          set -Eeuo pipefail
+          base='https://infiltrator-projects.github.io/Intune-Zabbix-Bridge'
+          manifest="$base/manifest.json"
+
+          for attempt in $(seq 1 30); do
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "$tmpdir"' EXIT
+
+            if curl -fsS --retry 2 --retry-delay 1 "$manifest?source=$GITHUB_SHA&attempt=$attempt" -o "$tmpdir/manifest.json" \
+              && jq -e \
+                --arg version "$VERSION" \
+                --arg filename "$FILENAME" \
+                --arg sha256 "$EXPECTED_SHA256" \
+                --arg source_sha "$GITHUB_SHA" \
+                '.package == "intune-zabbix-bridge" and .version == $version and .filename == $filename and .sha256 == $sha256 and .source_sha == $source_sha' \
+                "$tmpdir/manifest.json" >/dev/null \
+              && curl -fsS --retry 2 --retry-delay 1 "$base/$FILENAME?source=$GITHUB_SHA&attempt=$attempt" -o "$tmpdir/$FILENAME" \
+              && [[ "$(sha256sum "$tmpdir/$FILENAME" | awk '{print $1}')" == "$EXPECTED_SHA256" ]] \
+              && [[ "$(dpkg-deb --field "$tmpdir/$FILENAME" Package)" == intune-zabbix-bridge ]] \
+              && [[ "$(dpkg-deb --field "$tmpdir/$FILENAME" Version)" == "$VERSION" ]]; then
+              echo "Public APT handoff exposes the exact tested $FILENAME."
+              exit 0
             fi
-            echo "Central mirror already contains the exact tested $filename."
-          else
-            content="$(base64 -w0 "$deb")"
-            GH_TOKEN="$APT_TOKEN" gh api --method PUT \
-              "repos/$APT_REPO/contents/$path" \
-              -f message="Mirror Intune Zabbix Bridge $version" \
-              -f content="$content" \
-              -f branch=main >/dev/null
-            echo "Mirrored exact tested $filename into $APT_REPO."
-          fi
 
-          payload="$(jq -nc --arg repository "$GITHUB_REPOSITORY" --arg sha "$GITHUB_SHA" \
-            '{event_type:"application-release",client_payload:{repository:$repository,sha:$sha}}')"
-          if ! GH_TOKEN="$APT_TOKEN" gh api --method POST \
-            "repos/$APT_REPO/dispatches" --input - <<<"$payload"; then
-            echo "::warning::Immediate central APT dispatch failed; the central repository push/scheduled refresh remains the safety net."
-          fi
+            rm -rf "$tmpdir"
+            trap - EXIT
+            echo "Waiting for Pages handoff propagation ($attempt/30)..."
+            sleep 5
+          done
+
+          echo "::error::Public APT handoff did not expose the exact tested DEB."
+          exit 1
 
       - name: Verify central APT publication
         shell: bash
+        env:
+          VERSION: ${{ steps.handoff.outputs.version }}
+          FILENAME: ${{ steps.handoff.outputs.filename }}
+          EXPECTED_SHA256: ${{ steps.handoff.outputs.sha256 }}
         run: |
           set -Eeuo pipefail
-          version="$(jq -r '.version' module/intune_reboot_watch/manifest.json)"
-          catalogue='https://infiltrator-projects.github.io/Infiltrator-Repository/catalogue/apps.json'
-          packages='https://infiltrator-projects.github.io/Infiltrator-Repository/dists/alpha/main/binary-amd64/Packages.gz'
+          base='https://infiltrator-projects.github.io/Infiltrator-Repository'
+          catalogue="$base/catalogue/apps.json"
+          packages="$base/dists/alpha/main/binary-amd64/Packages.gz"
+          pool="$base/pool/main/$FILENAME"
 
           for attempt in $(seq 1 72); do
             catalogue_ok=false
             packages_ok=false
+            pool_ok=false
 
             if curl -fsS --retry 2 --retry-delay 1 "$catalogue?intune_release=$GITHUB_SHA&attempt=$attempt" \
-              | jq -e --arg version "$version" \
-                '.[] | select(.id == "intune-zabbix-bridge" and .version == $version)' >/dev/null; then
+              | jq -e --arg version "$VERSION" --arg sha256 "$EXPECTED_SHA256" \
+                '.[] | select(.id == "intune-zabbix-bridge" and .version == $version and .sha256 == $sha256)' >/dev/null; then
               catalogue_ok=true
             fi
 
             if curl -fsS --retry 2 --retry-delay 1 "$packages?intune_release=$GITHUB_SHA&attempt=$attempt" \
               | gzip -dc \
-              | awk -v version="$version" '
+              | awk -v version="$VERSION" -v sha256="$EXPECTED_SHA256" '
                   BEGIN { RS=""; found=0 }
                   $0 ~ /(^|\n)Package: intune-zabbix-bridge(\n|$)/ &&
-                  $0 ~ ("(^|\\n)Version: " version "(\\n|$)") { found=1 }
+                  $0 ~ ("(^|\\n)Version: " version "(\\n|$)") &&
+                  $0 ~ ("(^|\\n)SHA256: " sha256 "(\\n|$)") { found=1 }
                   END { exit(found ? 0 : 1) }
                 '; then
               packages_ok=true
             fi
 
-            if [[ "$catalogue_ok" == true && "$packages_ok" == true ]]; then
-              echo "Public APT repository advertises intune-zabbix-bridge ${version} in catalogue and Packages.gz."
+            tmp="$(mktemp)"
+            if curl -fsS --retry 2 --retry-delay 1 "$pool?intune_release=$GITHUB_SHA&attempt=$attempt" -o "$tmp" \
+              && [[ "$(sha256sum "$tmp" | awk '{print $1}')" == "$EXPECTED_SHA256" ]] \
+              && [[ "$(dpkg-deb --field "$tmp" Package)" == intune-zabbix-bridge ]] \
+              && [[ "$(dpkg-deb --field "$tmp" Version)" == "$VERSION" ]]; then
+              pool_ok=true
+            fi
+            rm -f "$tmp"
+
+            if [[ "$catalogue_ok" == true && "$packages_ok" == true && "$pool_ok" == true ]]; then
+              echo "Public APT repository advertises and serves the exact tested intune-zabbix-bridge ${VERSION}."
               exit 0
             fi
 
-            echo "Waiting for central APT publication of intune-zabbix-bridge ${version} ($attempt/72)..."
+            echo "Waiting for central APT publication of intune-zabbix-bridge ${VERSION} ($attempt/72)..."
             sleep 10
           done
 
-          echo "::error::Private release exists, but the public APT repository did not publish intune-zabbix-bridge ${version}."
+          echo "::error::Private release and public handoff exist, but central APT did not publish the exact tested intune-zabbix-bridge ${VERSION}."
           exit 1
