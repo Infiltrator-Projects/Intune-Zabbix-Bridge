@@ -1,6 +1,6 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.7.7  
+**Release:** 0.7.8  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** private/internal only
 
@@ -33,9 +33,11 @@ sudo install -o root -g root -m 0600 intune-zabbix-bridge.env \
 
 The package imports it into `/etc/intune-zabbix-bridge/bridge.env`, removes the inbox copy, enables the timer and performs the first collection. Per-user Downloads folders are not trusted.
 
-Reboot Watch combines the current managed-Windows estate, effective Windows Update Ring targeting membership, and actual reboot telemetry. Managed-device identity is keyed by immutable Intune `managedDevice.id`; duplicate computer names are not collapsed. Reboot telemetry is joined by that ID.
+Reboot Watch combines the current managed-Windows estate, Windows Update Ring policy-report state, and actual reboot telemetry. Managed-device identity is keyed by immutable Intune `managedDevice.id`; duplicate computer names are not collapsed. Reboot telemetry is joined by that ID.
 
-Ring membership is now read from Intune's `getTargetedUsersAndDevices` targeting action for each Windows Update Ring instead of the deprecated `deviceConfigurationDeviceStatus`/`deviceStatuses` path. Returned device identities are correlated first by immutable managed-device ID, then Azure AD device ID, with name/UPN fallback only when it resolves uniquely. If Intune returns rings but no resolvable targeted Windows devices, the collector fails closed instead of publishing a false all-unassigned fleet.
+Ring state is read from Intune's current `deviceManagement/reports/getConfigurationPolicyDevicesReport` reporting endpoint for each Windows Update Ring. The report is parsed from its returned schema rather than fixed column positions, and `IntuneDeviceId` is joined directly to immutable `managedDevice.id`. Name/UPN matching exists only as a conservative unique fallback. Duplicate user/system report rows for the same device and ring collapse to the newest report record.
+
+The shipped collector no longer relies on deprecated `deviceStatuses` or on inferred membership from `getTargetedUsersAndDevices`. If Intune returns rings but no usable ring report rows, collection fails closed rather than publishing a false all-unassigned fleet. Because the collector is a 15-minute oneshot, a dashboard collector age much greater than 15 minutes means recent collection attempts have failed and the displayed summary is the last successfully committed generation.
 
 The dashboard distinguishes **MISSED**, **Current**, **Unknown**, and **Not active** weekly restart states. Missing ring/telemetry signals remain visible rather than removing the machine, and fault rows are not hidden by the normal display limit or search filter. Headline counters are derived from the same authoritative device rows shown in the table, so the cards cannot contradict those rows.
 
@@ -43,4 +45,4 @@ The Zabbix widget is read-only. Import/link the packaged `Intune Zabbix Bridge` 
 
 The collector refuses to publish an empty Windows estate, sends the summary JSON only after all companion metrics have succeeded, and treats a materially future collector timestamp as unknown rather than current.
 
-Release publication is end-to-end: the exact tested DEB is mirrored into the central Infiltrator APT repository, and the release job does not succeed until both the public catalogue and APT `Packages.gz` advertise the same version.
+Release publication builds and tests the exact DEB and RUN artifacts before creating the private GitHub release. Public APT mirroring is a separate authenticated step and the release workflow fails if that handoff cannot be completed and verified.
