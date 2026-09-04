@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.8 — 2026-09-04
+
+- Replaced 0.7.7's `getTargetedUsersAndDevices` membership inference with Intune's current `getConfigurationPolicyDevicesReport` device policy report.
+- Ring rows now join directly by the report's immutable `IntuneDeviceId`; name/UPN is only an unambiguous fallback.
+- Added schema-driven report parsing, paging for every ring and newest-row selection for duplicate device/ring report rows.
+- The packaged collector now explicitly runs through the current report-backed ring source while preserving the hardened immutable fleet/reboot logic.
+- Added regressions for report parsing, pagination, immutable identity, ambiguity, duplicate report rows and packaged entry-point selection.
+- Fixes the collector-stale failure mode caused by unsuccessful ring discovery while retaining fail-closed behaviour when Intune genuinely returns no usable ring report rows.
+
 ## 0.7.7 — 2026-09-04
 
 - Replaced deprecated Windows Update Ring `deviceStatuses` with Intune effective targeting membership via `getTargetedUsersAndDevices`.
