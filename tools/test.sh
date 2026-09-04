@@ -44,12 +44,14 @@ grep -Fq 'PathExists=/etc/intune-zabbix-bridge/import/intune-zabbix-bridge.env' 
 grep -Fq 'SOURCE = Path("/etc/intune-zabbix-bridge/import/intune-zabbix-bridge.env")' "$ROOT/packaging/linux/import-config"
 grep -Fq 'stat.st_uid != 0' "$ROOT/packaging/linux/import-config"
 grep -Fq 'stat.st_mode & 0o022' "$ROOT/packaging/linux/import-config"
-grep -Fq 'getConfigurationPolicyDevicesReport' "$RING_REPORTS" || { echo 'ERROR: current Intune policy-report ring source is missing.' >&2; exit 1; }
+grep -Fq 'getConfigurationPolicyDevicesReport' "$RING_REPORTS" || { echo 'ERROR: retained Intune policy-report ring implementation is missing.' >&2; exit 1; }
 grep -Fq 'IntuneDeviceId' "$RING_REPORTS" || { echo 'ERROR: immutable Intune device ID ring join is missing.' >&2; exit 1; }
-! grep -Fq 'getTargetedUsersAndDevices' "$CURRENT_COLLECTOR" || { echo 'ERROR: shipped entry point returned to inferred targeting source.' >&2; exit 1; }
-! grep -Fq '/deviceStatuses' "$RING_REPORTS" || { echo 'ERROR: deprecated deviceStatuses ring API path returned to current source.' >&2; exit 1; }
-! grep -Fq 'deviceConfigurationStates' "$RING_REPORTS" || { echo 'ERROR: deprecated per-device configuration-state path returned to current source.' >&2; exit 1; }
-grep -Fq 'refusing to publish a misleading all-unassigned fleet' "$HARDENED_COLLECTOR"
+grep -Fq 'collect_telemetry_only' "$CURRENT_COLLECTOR" || { echo 'ERROR: emergency telemetry-only shipped runtime is missing.' >&2; exit 1; }
+grep -Fq 'Windows Update Ring collection is temporarily disabled' "$CURRENT_COLLECTOR" || { echo 'ERROR: emergency ring-disabled runtime warning is missing.' >&2; exit 1; }
+! grep -Fq 'fetch_update_rings(' "$CURRENT_COLLECTOR" || { echo 'ERROR: shipped emergency runtime must not enumerate update rings.' >&2; exit 1; }
+! grep -Fq 'fetch_ring_targets(' "$CURRENT_COLLECTOR" || { echo 'ERROR: shipped emergency runtime must not call ring-report Graph sources.' >&2; exit 1; }
+! grep -Fq '/deviceStatuses' "$RING_REPORTS" || { echo 'ERROR: deprecated deviceStatuses ring API path returned to retained source.' >&2; exit 1; }
+! grep -Fq 'deviceConfigurationStates' "$RING_REPORTS" || { echo 'ERROR: deprecated per-device configuration-state path returned to retained source.' >&2; exit 1; }
 trap_count="$(grep -c '^[[:space:]]*type: TRAP$' "$ROOT/zabbix/template_intune_zabbix_bridge.yaml")"
 allowed_count="$(grep -c "^[[:space:]]*allowed_hosts: '127.0.0.1,::1'$" "$ROOT/zabbix/template_intune_zabbix_bridge.yaml")"
 [[ "$trap_count" -gt 0 && "$allowed_count" -eq "$trap_count" ]] || { echo 'ERROR: every trapper item must restrict allowed_hosts.' >&2; exit 1; }
@@ -80,6 +82,7 @@ if command -v dpkg-deb >/dev/null 2>&1; then
     [[ -f "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/ring_reports.py" ]]
     [[ -f "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/current.py" ]]
     grep -Fq 'from intune_zabbix_bridge.current import main' "$extract/usr/bin/intune-zabbix-bridge"
+    grep -Fq 'collect_telemetry_only' "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/current.py"
     [[ -f "$extract/usr/lib/systemd/system/intune-zabbix-bridge-import.path" ]]
     [[ -f "$extract/usr/lib/systemd/system/intune-zabbix-bridge-import.service" ]]
     [[ "$(stat -c '%a' "$extract/etc/intune-zabbix-bridge/import")" == "700" ]]
