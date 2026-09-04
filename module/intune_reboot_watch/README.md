@@ -1,9 +1,7 @@
 # INTUNE — Reboot Watch
 
-**Release:** 0.7.5  
+**Release:** 0.7.6  
 **Platform:** Zabbix 7.0 LTS
-
-<!-- CI transition compatibility: **Release:** 0.7.4 -->
 
 Reboot Watch has one operational job: show the Windows machines covered by Intune update policy and tell us whether they have satisfied the required weekly restart.
 

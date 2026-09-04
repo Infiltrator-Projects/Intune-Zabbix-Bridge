@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.6 — 2026-09-04
+
+- Fixed the release pipeline itself rather than relying on manual APT repair: the exact tested Intune DEB is now mirrored into `Infiltrator-Repository` as part of the release job.
+- A released version is immutable in the mirror; the workflow refuses to overwrite an existing same-version DEB with different bytes.
+- The Intune release job now fails unless both the public software catalogue and the live APT `Packages.gz` advertise the release version.
+- The central repository no longer pins Intune to one hard-coded version. It discovers mirrored Intune DEBs by filename and orders them using Debian version semantics.
+- Added regression guards so the Intune APT handoff, public-feed verification and version-dynamic central mirror cannot silently disappear.
+
 ## 0.7.5 — 2026-09-04
 
 - Replaced hostname as the fleet join key with immutable Intune `managedDevice.id`; duplicate computer names now remain distinct devices.

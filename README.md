@@ -1,6 +1,6 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.7.5  
+**Release:** 0.7.6  
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** private/internal only
 
@@ -40,3 +40,5 @@ The dashboard distinguishes **MISSED**, **Current**, **Unknown**, and **Not acti
 The Zabbix widget is read-only. Import/link the packaged `Intune Zabbix Bridge` template and create/link the `Microsoft Intune - Windows Fleet` host during setup; merely opening the dashboard never creates Zabbix objects. Trapper items in the packaged template accept submissions from `127.0.0.1` and `::1` only by default.
 
 The collector refuses to publish an empty Windows estate, sends the summary JSON only after all companion metrics have succeeded, and treats a materially future collector timestamp as unknown rather than current.
+
+Release publication is end-to-end: the exact tested DEB is mirrored into the central Infiltrator APT repository, and the release job does not succeed until both the public catalogue and APT `Packages.gz` advertise the same version.

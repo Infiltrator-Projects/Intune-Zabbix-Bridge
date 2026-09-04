@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.6 — 2026-09-04
+
+- Release publication now mirrors the exact tested Debian package into the central Infiltrator APT repository automatically.
+- The release fails closed if the same version already exists in the mirror with different bytes.
+- The release does not complete until both the public software catalogue and APT `Packages.gz` advertise the same version.
+- Added regression coverage for the APT handoff and public-feed verification contract.
+
 ## 0.7.5 — 2026-09-04
 
 - Changed the authoritative fleet identity from computer name to immutable Intune `managedDevice.id`; duplicate names no longer collapse or exchange reboot telemetry.
