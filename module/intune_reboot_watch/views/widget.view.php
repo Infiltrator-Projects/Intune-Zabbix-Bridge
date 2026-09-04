@@ -77,17 +77,6 @@ $health = (new CDiv([
 
 $stats = (new CDiv([
     $stat(_('Windows'), (string) $summary['expected_devices']),
-    $stat(_('One ring'), (string) $summary['one_ring_devices'], 'is-good'),
-    $stat(
-        _('No ring reported'),
-        (string) $summary['no_ring_devices'],
-        (int) $summary['no_ring_devices'] > 0 ? 'is-critical' : ''
-    ),
-    $stat(
-        _('Multiple rings'),
-        (string) $summary['multiple_ring_devices'],
-        (int) $summary['multiple_ring_devices'] > 0 ? 'is-critical' : ''
-    ),
     $stat(
         _('Missed reboot'),
         (string) $summary['reboot_missed_devices'],
@@ -121,8 +110,8 @@ $stats = (new CDiv([
 $search = (new CInput('search', null))
     ->addClass('irw-search')
     ->setAttribute('data-irw-search', '1')
-    ->setAttribute('placeholder', _('Search computer, username or update ring'))
-    ->setAttribute('aria-label', _('Search by computer name, username or update ring'))
+    ->setAttribute('placeholder', _('Search computer or username'))
+    ->setAttribute('aria-label', _('Search by computer name or username'))
     ->setAttribute('autocomplete', 'off');
 
 $shown_initially = min($row_limit, count($data['rows']));
@@ -139,9 +128,6 @@ $table = (new CTableInfo())
         $sort_header('#', 'rank', 'number', 'asc'),
         $sort_header(_('Computer'), 'computer', 'text', 'asc'),
         $sort_header(_('User'), 'user', 'text', 'asc'),
-        $sort_header(_('Update ring'), 'ring-name', 'text', 'asc'),
-        $sort_header(_('Ring state'), 'ring-state', 'text', 'asc'),
-        $sort_header(_('Ring reported'), 'ring-reported', 'number', 'desc'),
         $sort_header(_('Reboot'), 'reboot-priority', 'number', 'desc', true),
         $sort_header(_('Due / next'), 'reboot-due', 'number', 'asc'),
         $sort_header(_('Uptime'), 'uptime', 'number', 'desc'),
@@ -158,12 +144,6 @@ foreach ($data['rows'] as $row) {
     $telemetry = (new CSpan((string) $row['telemetry_label']))
         ->addClass('irw-telemetry-status')
         ->addClass('is-'.$row['telemetry_status']);
-    $ring = (new CSpan((string) $row['ring_state_label']))
-        ->addClass('irw-ring-status')
-        ->addClass('is-'.$row['ring_state']);
-    $ring_state_text = $row['ring_state'] === 'one'
-        ? (string) $row['ring_status']
-        : (string) $row['ring_state_label'];
     $reboot = (new CSpan((string) $row['reboot_label']))
         ->addClass('irw-reboot-status')
         ->addClass('is-'.$row['reboot_state']);
@@ -173,9 +153,6 @@ foreach ($data['rows'] as $row) {
             (new CSpan((string) $row['rank']))->addClass('irw-rank'),
             (new CSpan((string) $row['computer_name']))->addClass('irw-computer'),
             (string) ($row['user'] !== '' ? $row['user'] : '—'),
-            (string) ($row['ring_name'] !== '' ? $row['ring_name'] : '—'),
-            new CDiv([$ring, new CSpan(' '.$ring_state_text)]),
-            (string) $row['ring_last_reported'],
             $reboot,
             (string) $row['reboot_due'],
             $uptime,
@@ -186,17 +163,12 @@ foreach ($data['rows'] as $row) {
         ]))
             ->addClass('irw-data-row')
             ->addClass('is-'.$row['telemetry_status'])
-            ->addClass('is-ring-'.$row['ring_state'])
             ->addClass('is-reboot-'.$row['reboot_state'])
             ->setAttribute('data-computer-name', (string) $row['computer_name'])
             ->setAttribute('data-user', (string) $row['user'])
-            ->setAttribute('data-ring-name', (string) $row['ring_name'])
             ->setAttribute('data-sort-rank', (string) $row['rank'])
             ->setAttribute('data-sort-computer', (string) $row['computer_name'])
             ->setAttribute('data-sort-user', (string) $row['user'])
-            ->setAttribute('data-sort-ring-name', (string) $row['ring_name'])
-            ->setAttribute('data-sort-ring-state', $ring_state_text)
-            ->setAttribute('data-sort-ring-reported', (string) $row['ring_last_reported_sort'])
             ->setAttribute('data-sort-reboot-priority', (string) $row['reboot_priority'])
             ->setAttribute('data-sort-reboot-due', (string) $row['reboot_due_sort'])
             ->setAttribute('data-sort-telemetry-status', (string) $row['telemetry_status'])
@@ -229,14 +201,14 @@ $footer = (new CDiv([
         .' '.(string) $summary['weekly_restart_time']
         .' · policy start '.(string) $summary['weekly_restart_policy_start']
     )),
-    (new CSpan(_('Ring/reboot/telemetry faults are never hidden.'))),
+    (new CSpan(_('Reboot/telemetry faults are never hidden.'))),
     (new CSpan(_('Zabbix received: ').(string) $data['received_at']))
 ]))->addClass('irw-footer');
 
 $contents = (new CDiv([$health, $stats, $toolbar, $table, $footer]))
     ->addClass('irw')
     ->setAttribute('data-row-limit', (string) $row_limit)
-    ->setAttribute('data-no-search-results', _('No computers, usernames or update rings match the search.'));
+    ->setAttribute('data-no-search-results', _('No computers or usernames match the search.'));
 
 (new CWidgetView($data))
     ->addItem($contents)
