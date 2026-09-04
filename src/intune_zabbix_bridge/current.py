@@ -107,7 +107,7 @@ def collect_telemetry_only(
     ]
 
     hardened.LOG.warning(
-        "Windows Update Ring collection is disabled; publishing the current "
+        "Windows Update Ring collection is temporarily disabled; publishing the current "
         "reboot-telemetry population only."
     )
     records = hardened.merge_fleet_devices(
