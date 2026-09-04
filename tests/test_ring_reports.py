@@ -153,15 +153,18 @@ class CurrentRingReportTests(unittest.TestCase):
         self.assertEqual(reports[0].status, "succeeded")
 
     def test_shipped_collector_does_not_call_any_ring_graph_source(self):
-        managed = [{
-            "id": "device-a",
-            "deviceName": "PC-A",
-            "userPrincipalName": "a@example.com",
-            "operatingSystem": "Windows",
+        states = [{
+            "preRemediationDetectionScriptOutput":
+                "DEVICE=PC-A;LASTBOOT=2026-09-03T00:00:00Z;UPTIME_HOURS=30",
+            "lastStateUpdateDateTime": "2026-09-04T04:00:00Z",
+            "managedDevice": {
+                "id": "device-a",
+                "deviceName": "PC-A",
+                "userPrincipalName": "a@example.com",
+            },
         }]
         with patch.object(current.legacy, "get_access_token", return_value="token"), \
-             patch.object(current.hardened, "fetch_managed_windows_devices", return_value=managed), \
-             patch.object(current.legacy, "fetch_run_states", return_value=[]), \
+             patch.object(current.legacy, "fetch_run_states", return_value=states), \
              patch.object(current.legacy, "fetch_update_rings") as rings, \
              patch.object(current.hardened, "fetch_ring_targets") as targets:
             records, metrics = current.collect_telemetry_only(self.config())
