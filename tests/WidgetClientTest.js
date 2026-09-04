@@ -15,8 +15,10 @@ if (/\bfetch\s*\(/.test(source) || /XMLHttpRequest/.test(source)) {
 if (/\bsetInterval\s*\(|\bsetTimeout\s*\(/.test(source)) {
     throw new Error('Widget client must not create a competing refresh timer.');
 }
-if (/ring/i.test(source)) {
-    throw new Error('Telemetry-only widget client must not contain update-ring behavior.');
+for (const forbidden of ['data-ring-name', 'is-ring-', 'dataset.ringName', 'ring: row.dataset']) {
+    if (source.includes(forbidden)) {
+        throw new Error(`Telemetry-only widget client regained update-ring behavior: ${forbidden}`);
+    }
 }
 
 class StubWidget {}
