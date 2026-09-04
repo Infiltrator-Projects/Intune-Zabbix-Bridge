@@ -65,7 +65,7 @@ if ($summary['expected_devices'] !== 4
         || $summary['reporting_devices'] !== 3
         || $summary['stale_devices'] !== 1
         || $summary['missing_devices'] !== 1) {
-    fail_fleet('Counters were not preserved.');
+    fail_fleet('Counters were not preserved for legacy top-only summaries.');
 }
 
 $full_summary = $parser->parse(json_encode([
@@ -77,12 +77,13 @@ $full_summary = $parser->parse(json_encode([
             'ring_name' => 'Ring B',
             'ring_count' => 1,
             'ring_state' => 'one',
-            'ring_status' => 'compliant',
+            'ring_status' => 'targeted',
             'ring_last_reported' => '2026-09-02T02:50:00+00:00',
             'reboot_state' => 'missed',
             'reboot_priority' => 3,
             'reboot_due' => '2026-09-05T17:00:00+00:00',
-            'uptime_days' => 3
+            'uptime_days' => 3,
+            'telemetry_status' => 'fresh'
         ],
         [
             'computer_name' => 'PC-1',
@@ -90,11 +91,12 @@ $full_summary = $parser->parse(json_encode([
             'ring_name' => '',
             'ring_count' => 0,
             'ring_state' => 'none',
-            'ring_status' => 'not-reported',
+            'ring_status' => 'not-targeted',
             'reboot_state' => 'unknown',
             'reboot_priority' => 2,
             'reboot_due' => '2026-09-05T17:00:00+00:00',
-            'uptime_days' => 1
+            'uptime_days' => 1,
+            'telemetry_status' => 'fresh'
         ],
         [
             'computer_name' => 'PC-2',
@@ -106,7 +108,8 @@ $full_summary = $parser->parse(json_encode([
             'reboot_state' => 'unknown',
             'reboot_priority' => 2,
             'reboot_due' => '2026-09-05T17:00:00+00:00',
-            'uptime_days' => 2
+            'uptime_days' => 2,
+            'telemetry_status' => 'fresh'
         ],
         [
             'computer_name' => 'PC-MISSING',
@@ -114,7 +117,7 @@ $full_summary = $parser->parse(json_encode([
             'ring_name' => 'Ring A',
             'ring_count' => 1,
             'ring_state' => 'one',
-            'ring_status' => 'compliant',
+            'ring_status' => 'targeted',
             'reboot_state' => 'unknown',
             'reboot_priority' => 2,
             'reboot_due' => '2026-09-05T17:00:00+00:00',
@@ -136,7 +139,7 @@ if ($full_summary['devices'][3]['computer_name'] !== 'PC-MISSING'
         || $full_summary['devices'][3]['ring_name'] !== 'Ring A'
         || $full_summary['devices'][3]['ring_state'] !== 'one'
         || $full_summary['devices'][3]['uptime_days'] !== null) {
-    fail_fleet('Ring-reported device with missing telemetry was not preserved.');
+    fail_fleet('Ring-targeted device with missing telemetry was not preserved.');
 }
 if (count($full_summary['top']) !== 2) {
     fail_fleet('Visible top list did not honour the row limit.');
@@ -147,6 +150,56 @@ if ($full_summary['devices'][0]['computer_name'] !== 'PC-3') {
 if ($full_summary['devices'][0]['reboot_state'] !== 'missed'
         || $full_summary['devices'][0]['reboot_due'] === '') {
     fail_fleet('Reboot requirement state was not preserved.');
+}
+
+if ($full_summary['expected_devices'] !== 4
+        || $full_summary['one_ring_devices'] !== 2
+        || $full_summary['no_ring_devices'] !== 1
+        || $full_summary['multiple_ring_devices'] !== 1
+        || $full_summary['ring_reporting_devices'] !== 3
+        || $full_summary['reboot_missed_devices'] !== 1
+        || $full_summary['reboot_unknown_devices'] !== 3
+        || $full_summary['fresh_devices'] !== 3
+        || $full_summary['missing_devices'] !== 1) {
+    fail_fleet('Full-summary counters were not derived from the authoritative device rows.');
+}
+
+$contradictory = $parser->parse(json_encode([
+    'expected_devices' => 2,
+    'one_ring_devices' => 0,
+    'no_ring_devices' => 0,
+    'multiple_ring_devices' => 0,
+    'reboot_unknown_devices' => 0,
+    'fresh_devices' => 0,
+    'devices' => [
+        [
+            'computer_name' => 'PC-A',
+            'ring_name' => 'Ring 1',
+            'ring_count' => 1,
+            'ring_state' => 'one',
+            'ring_status' => 'targeted',
+            'reboot_state' => 'unknown',
+            'telemetry_status' => 'fresh',
+            'uptime_days' => 1
+        ],
+        [
+            'computer_name' => 'PC-B',
+            'ring_name' => 'Ring 2',
+            'ring_count' => 1,
+            'ring_state' => 'one',
+            'ring_status' => 'targeted',
+            'reboot_state' => 'unknown',
+            'telemetry_status' => 'fresh',
+            'uptime_days' => 2
+        ]
+    ]
+], JSON_THROW_ON_ERROR));
+
+if ($contradictory['one_ring_devices'] !== 2
+        || $contradictory['no_ring_devices'] !== 0
+        || $contradictory['reboot_unknown_devices'] !== 2
+        || $contradictory['fresh_devices'] !== 2) {
+    fail_fleet('Dashboard counters can still contradict the device rows.');
 }
 
 fwrite(STDOUT, "FleetSummary tests passed.\n");
