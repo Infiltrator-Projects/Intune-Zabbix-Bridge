@@ -1,0 +1,44 @@
+name: Export verified Intune DEB
+
+description: Build and verify the Intune Debian package for the central public APT repository.
+
+outputs:
+  version:
+    description: Debian package version
+    value: ${{ steps.export.outputs.version }}
+  sha256:
+    description: SHA-256 of the exported Debian package
+    value: ${{ steps.export.outputs.sha256 }}
+  path:
+    description: Exported Debian package path
+    value: ${{ steps.export.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build and verify private package source
+      id: export
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        source_root="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
+        version="$(jq -r '.version' "$source_root/module/intune_reboot_watch/manifest.json")"
+        test -n "$version"
+
+        work="$(mktemp -d)"
+        trap 'rm -rf "$work"' EXIT
+        "$source_root/tools/build-deb.sh" "$work" >/dev/null
+        deb="$work/intune-zabbix-bridge_${version}_all.deb"
+
+        test "$(dpkg-deb --field "$deb" Package)" = intune-zabbix-bridge
+        test "$(dpkg-deb --field "$deb" Version)" = "$version"
+        test "$(dpkg-deb --field "$deb" Architecture)" = all
+
+        mkdir -p "$GITHUB_WORKSPACE/private-intune-export"
+        output="$GITHUB_WORKSPACE/private-intune-export/$(basename "$deb")"
+        install -m 0644 "$deb" "$output"
+        sha256="$(sha256sum "$output" | awk '{print $1}')"
+
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+        echo "path=$output" >> "$GITHUB_OUTPUT"
