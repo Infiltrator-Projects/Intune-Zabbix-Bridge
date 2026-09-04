@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """Hardened Intune -> Zabbix collector.
 
-This module keeps the existing Graph/reboot policy implementation but changes the
-fleet identity and publication boundaries:
+The collector keeps three planes of truth separate:
 
-* managedDevice.id is the authoritative device key;
-* reboot telemetry joins only by expanded managedDevice.id;
-* legacy ring status objects, which expose no managedDevice relationship, are
-  attached only when name/UPN resolves to exactly one current managed device;
-* an empty managed-Windows result fails closed;
-* the dashboard summary is sent last and acts as the generation commit marker.
+* managedDevice.id is the authoritative fleet identity;
+* Windows Update Ring membership comes from Intune's current targeting action,
+  not the deprecated deviceConfigurationDeviceStatus feed;
+* reboot telemetry joins only by expanded managedDevice.id.
+
+The dashboard summary is published last and acts as the generation commit marker.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ import json
 import logging
 import subprocess
 import sys
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable
@@ -34,6 +34,7 @@ class ManagedDevice:
     managed_device_id: str
     computer_name: str
     user: str
+    azure_ad_device_id: str = ""
     last_sync: datetime | None = None
 
 
@@ -132,7 +133,8 @@ def fetch_managed_windows_devices(
 ) -> list[dict[str, Any]]:
     url = (
         f"{legacy.GRAPH_V1_ROOT}/deviceManagement/managedDevices"
-        "?$top=999&$select=id,deviceName,userPrincipalName,operatingSystem,lastSyncDateTime"
+        "?$top=999&$select=id,deviceName,userPrincipalName,operatingSystem,"
+        "azureADDeviceId,lastSyncDateTime"
     )
     return legacy.graph_get_all(config, token, url)
 
@@ -163,14 +165,16 @@ def parse_managed_windows_devices(
             managed_device_id=managed_device_id,
             computer_name=computer_name,
             user=str(device.get("userPrincipalName") or "").strip(),
+            azure_ad_device_id=str(device.get("azureADDeviceId") or "").strip(),
             last_sync=last_sync,
         )
-        existing = newest_by_id.get(managed_device_id.casefold())
+        key = managed_device_id.casefold()
+        existing = newest_by_id.get(key)
         if existing is None or (
             record.last_sync is not None
             and (existing.last_sync is None or record.last_sync > existing.last_sync)
         ):
-            newest_by_id[managed_device_id.casefold()] = record
+            newest_by_id[key] = record
 
     return list(newest_by_id.values())
 
@@ -228,20 +232,108 @@ def parse_run_states(
     return list(newest_by_id.values())
 
 
-def _unique_identity_maps(
+def _graph_post(
+    config: legacy.Config,
+    token: str,
+    url: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+    )
+    return legacy._request_json(
+        request,
+        timeout=config.http_timeout,
+        retries=config.http_retries,
+    )
+
+
+def fetch_ring_targets(
+    config: legacy.Config,
+    token: str,
+    rings: Iterable[legacy.UpdateRing],
+) -> list[dict[str, Any]]:
+    """Fetch effective targets for each update ring.
+
+    Intune's deviceConfigurationDeviceStatus entity is deprecated. Ring
+    membership is an assignment/targeting question, so this uses
+    getTargetedUsersAndDevices once per ring and annotates each returned target
+    with the authoritative ring id/name.
+    """
+    endpoint = (
+        f"{legacy.GRAPH_BETA_ROOT}/deviceManagement/deviceConfigurations/"
+        "getTargetedUsersAndDevices"
+    )
+    targets: list[dict[str, Any]] = []
+
+    for ring in rings:
+        page = _graph_post(
+            config,
+            token,
+            endpoint,
+            {"deviceConfigurationIds": [ring.ring_id]},
+        )
+        while True:
+            values = page.get("value", [])
+            if not isinstance(values, list):
+                raise RuntimeError(
+                    f"Intune targeting response for {ring.display_name} did not contain a list."
+                )
+            for item in values:
+                if not isinstance(item, dict):
+                    continue
+                target = dict(item)
+                target["_ring_id"] = ring.ring_id
+                target["_ring_name"] = ring.display_name
+                targets.append(target)
+
+            next_link = str(page.get("@odata.nextLink") or "").strip()
+            if not next_link:
+                break
+            page = legacy.graph_get(config, token, next_link)
+
+    return targets
+
+
+def _identity_maps(
     managed_devices: Iterable[ManagedDevice],
-) -> tuple[dict[tuple[str, str], str], dict[str, str]]:
+) -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[tuple[str, str], str],
+    dict[str, str],
+]:
+    by_managed_id: dict[str, str] = {}
+    by_aad_id_candidates: dict[str, set[str]] = {}
     by_name_user_candidates: dict[tuple[str, str], set[str]] = {}
     by_name_candidates: dict[str, set[str]] = {}
 
     for device in managed_devices:
         device_id = device.managed_device_id
+        by_managed_id[device_id.casefold()] = device_id
+
+        aad_id = device.azure_ad_device_id.casefold()
+        if aad_id:
+            by_aad_id_candidates.setdefault(aad_id, set()).add(device_id)
+
         name = device.computer_name.casefold()
         user = device.user.casefold()
         by_name_candidates.setdefault(name, set()).add(device_id)
         if user:
             by_name_user_candidates.setdefault((name, user), set()).add(device_id)
 
+    by_aad_id = {
+        key: next(iter(ids))
+        for key, ids in by_aad_id_candidates.items()
+        if len(ids) == 1
+    }
     by_name_user = {
         key: next(iter(ids))
         for key, ids in by_name_user_candidates.items()
@@ -252,45 +344,77 @@ def _unique_identity_maps(
         for key, ids in by_name_candidates.items()
         if len(ids) == 1
     }
-    return by_name_user, by_name
+    return by_managed_id, by_aad_id, by_name_user, by_name
 
 
-def attach_ring_reports(
+def parse_ring_targets(
     managed_devices: list[ManagedDevice],
-    statuses: Iterable[dict[str, Any]],
+    targets: Iterable[dict[str, Any]],
 ) -> list[RingReport]:
-    legacy_reports = legacy.parse_ring_reports(statuses)
-    by_name_user, by_name = _unique_identity_maps(managed_devices)
+    by_managed_id, by_aad_id, by_name_user, by_name = _identity_maps(managed_devices)
+    managed_by_id = {d.managed_device_id.casefold(): d for d in managed_devices}
     newest_by_device_ring: dict[tuple[str, str], RingReport] = {}
 
-    for report in legacy_reports:
-        name = report.computer_name.casefold()
-        user = report.user.casefold()
-        managed_device_id = by_name_user.get((name, user)) if user else None
-        if managed_device_id is None:
-            managed_device_id = by_name.get(name)
+    for target in targets:
+        ring_id = str(target.get("_ring_id") or "").strip()
+        ring_name = str(target.get("_ring_name") or "").strip()
+        if not ring_id or not ring_name:
+            continue
+
+        target_id = str(target.get("deviceId") or "").strip().casefold()
+        target_name = str(target.get("deviceName") or "").strip()
+        target_user = str(target.get("userPrincipalName") or "").strip()
+
+        managed_device_id = by_managed_id.get(target_id) if target_id else None
+        if managed_device_id is None and target_id:
+            managed_device_id = by_aad_id.get(target_id)
+
+        if managed_device_id is None and target_name and target_user:
+            managed_device_id = by_name_user.get(
+                (target_name.casefold(), target_user.casefold())
+            )
+        if managed_device_id is None and target_name:
+            managed_device_id = by_name.get(target_name.casefold())
+
         if managed_device_id is None:
             LOG.warning(
-                "Not attaching ambiguous update-ring report for %s / %s",
-                report.computer_name,
-                report.ring_name,
+                "Not attaching unresolved update-ring target %s / %s (deviceId=%s)",
+                target_name or "<unnamed>",
+                ring_name,
+                target_id or "<none>",
             )
             continue
 
+        managed = managed_by_id[managed_device_id.casefold()]
+        last_checkin_raw = str(target.get("lastCheckinDateTime") or "").strip()
+        last_checkin: datetime | None = None
+        if last_checkin_raw:
+            try:
+                last_checkin = legacy.parse_datetime(last_checkin_raw)
+            except (TypeError, ValueError):
+                LOG.warning(
+                    "Ignoring malformed ring targeting check-in for %s / %s",
+                    managed.computer_name,
+                    ring_name,
+                )
+
         record = RingReport(
             managed_device_id=managed_device_id,
-            computer_name=report.computer_name,
-            user=report.user,
-            ring_id=report.ring_id,
-            ring_name=report.ring_name,
-            status=report.status,
-            last_reported=report.last_reported,
+            computer_name=managed.computer_name,
+            user=target_user or managed.user,
+            ring_id=ring_id,
+            ring_name=ring_name,
+            status="targeted",
+            last_reported=last_checkin,
         )
-        key = (managed_device_id.casefold(), report.ring_id.casefold())
+        key = (managed_device_id.casefold(), ring_id.casefold())
         existing = newest_by_device_ring.get(key)
         if existing is None or (
             record.last_reported is not None
-            and (existing.last_reported is None or record.last_reported > existing.last_reported)
+            and (
+                existing.last_reported is None
+                or record.last_reported > existing.last_reported
+            )
         ):
             newest_by_device_ring[key] = record
 
@@ -321,7 +445,7 @@ def merge_fleet_devices(
 
         if ring_count == 0:
             ring_state = "none"
-            ring_status = "not-reported"
+            ring_status = "not-targeted"
             ring_last_reported = None
             ring_user = ""
         elif ring_count == 1:
@@ -385,7 +509,9 @@ def build_metrics(
     )
 
     reboot_by_id = {
-        r.managed_device_id.casefold(): legacy.evaluate_reboot_requirement(r, config=config, now=now)
+        r.managed_device_id.casefold(): legacy.evaluate_reboot_requirement(
+            r, config=config, now=now
+        )
         for r in records
     }
 
@@ -453,8 +579,12 @@ def build_metrics(
         "intune.windows.uptime.over7.count": str(sum((r.uptime_days or 0.0) >= 7 for r in fresh)),
         "intune.windows.uptime.over14.count": str(sum((r.uptime_days or 0.0) >= 14 for r in fresh)),
         "intune.windows.uptime.over30.count": str(sum((r.uptime_days or 0.0) >= 30 for r in fresh)),
-        "intune.windows.last.collection.epoch": str(int(latest_collection.timestamp()) if latest_collection else 0),
-        "intune.windows.top10": legacy.build_top_table(records, top_n=config.top_n, local_tz=local_tz),
+        "intune.windows.last.collection.epoch": str(
+            int(latest_collection.timestamp()) if latest_collection else 0
+        ),
+        "intune.windows.top10": legacy.build_top_table(
+            records, top_n=config.top_n, local_tz=local_tz
+        ),
         SUMMARY_KEY: json.dumps(summary, separators=(",", ":")),
     }
 
@@ -475,7 +605,9 @@ def _send_metric(config: legacy.Config, key: str, value: str) -> None:
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError(f"zabbix_sender failure for {key}: {completed.stdout.strip()}")
+        raise RuntimeError(
+            f"zabbix_sender failure for {key}: {completed.stdout.strip()}"
+        )
 
 
 def send_metrics(
@@ -500,17 +632,25 @@ def collect(config: legacy.Config) -> tuple[list[FleetDevice], dict[str, str]]:
     now = datetime.now(timezone.utc)
     token = legacy.get_access_token(config)
 
-    managed_devices = parse_managed_windows_devices(fetch_managed_windows_devices(config, token))
+    managed_devices = parse_managed_windows_devices(
+        fetch_managed_windows_devices(config, token)
+    )
     if not managed_devices:
         raise RuntimeError(
-            "Microsoft Graph returned zero managed Windows devices; refusing to publish an empty fleet."
+            "Microsoft Graph returned zero managed Windows devices; "
+            "refusing to publish an empty fleet."
         )
 
     rings = legacy.fetch_update_rings(config, token)
-    raw_ring_statuses = legacy.fetch_ring_device_statuses(config, token, rings)
-    raw_states = legacy.fetch_run_states(config, token)
+    raw_ring_targets = fetch_ring_targets(config, token, rings)
+    ring_reports = parse_ring_targets(managed_devices, raw_ring_targets)
+    if not ring_reports:
+        raise RuntimeError(
+            "Intune returned update rings but no resolvable targeted Windows devices; "
+            "refusing to publish a misleading all-unassigned fleet."
+        )
 
-    ring_reports = attach_ring_reports(managed_devices, raw_ring_statuses)
+    raw_states = legacy.fetch_run_states(config, token)
     telemetry_records = parse_run_states(
         raw_states,
         now=now,
@@ -532,7 +672,9 @@ def main(argv: list[str] | None = None) -> int:
         records, metrics = collect(config)
         summary = json.loads(metrics[SUMMARY_KEY])
         LOG.info(
-            "Fleet %d Windows devices (%d one ring, %d no ring, %d multiple rings; %d telemetry reporting, %d fresh, %d stale, %d missing; %d missed reboot, %d current, %d unknown, %d not active)",
+            "Fleet %d Windows devices (%d one ring, %d no ring, %d multiple rings; "
+            "%d telemetry reporting, %d fresh, %d stale, %d missing; "
+            "%d missed reboot, %d current, %d unknown, %d not active)",
             summary["expected_devices"],
             summary["one_ring_devices"],
             summary["no_ring_devices"],
@@ -548,7 +690,11 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         if args.dry_run:
-            print(metrics[SUMMARY_KEY] if args.json_output else metrics["intune.windows.top10"])
+            print(
+                metrics[SUMMARY_KEY]
+                if args.json_output
+                else metrics["intune.windows.top10"]
+            )
             return 0
 
         send_metrics(config, metrics)
