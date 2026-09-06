@@ -24,6 +24,7 @@ from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
 from . import collector as legacy
+from .transport import encode_summary
 
 LOG = logging.getLogger("intune-zabbix-bridge")
 SUMMARY_KEY = "intune.windows.summary.json"
@@ -618,14 +619,16 @@ def send_metrics(
 ) -> None:
     send_one = sender or _send_metric
 
+    if SUMMARY_KEY not in metrics:
+        raise RuntimeError("summary metric is missing from generated metrics")
+    wire_summary = encode_summary(metrics[SUMMARY_KEY])
+
     for key, value in metrics.items():
         if key == SUMMARY_KEY:
             continue
         send_one(config, key, value)
 
-    if SUMMARY_KEY not in metrics:
-        raise RuntimeError("summary metric is missing from generated metrics")
-    send_one(config, SUMMARY_KEY, metrics[SUMMARY_KEY])
+    send_one(config, SUMMARY_KEY, wire_summary)
 
 
 def collect(config: legacy.Config) -> tuple[list[FleetDevice], dict[str, str]]:

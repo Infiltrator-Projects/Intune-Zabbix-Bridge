@@ -19,6 +19,7 @@ install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/collector.py" "$root/usr/lib
 install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/hardened.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/hardened.py"
 install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/ring_reports.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/ring_reports.py"
 install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/current.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/current.py"
+install -m 0644 "$ROOT_DIR/src/intune_zabbix_bridge/transport.py" "$root/usr/lib/python3/dist-packages/intune_zabbix_bridge/transport.py"
 cat > "$root/usr/bin/intune-zabbix-bridge" <<'PY'
 #!/usr/bin/python3
 from intune_zabbix_bridge.current import main

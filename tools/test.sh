@@ -24,6 +24,7 @@ node --check "$MODULE/assets/js/class.widget.js"
 node --check "$ROOT/tests/WidgetClientTest.js"
 echo "[4/14] Fleet summary regression"
 php "$ROOT/tests/FleetSummaryTest.php"
+php "$ROOT/tests/SummaryTransportTest.php"
 echo "[5/14] Telemetry freshness regression"
 php "$ROOT/tests/TelemetryStateTest.php"
 echo "[6/14] WidgetView source contract"
@@ -81,6 +82,10 @@ if command -v dpkg-deb >/dev/null 2>&1; then
     [[ -f "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/hardened.py" ]]
     [[ -f "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/ring_reports.py" ]]
     [[ -f "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/current.py" ]]
+    [[ -f "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/transport.py" ]]
+    INTUNE_TEST_WIDGET_ROOT="$extract/usr/share/zabbix/modules/intune_reboot_watch" \
+        PYTHONPATH="$extract/usr/lib/python3/dist-packages" \
+        python3 -m unittest discover -s "$ROOT/tests" -p 'test_transport.py' -v
     grep -Fq 'from intune_zabbix_bridge.current import main' "$extract/usr/bin/intune-zabbix-bridge"
     grep -Fq 'collect_telemetry_only' "$extract/usr/lib/python3/dist-packages/intune_zabbix_bridge/current.py"
     [[ -f "$extract/usr/lib/systemd/system/intune-zabbix-bridge-import.path" ]]

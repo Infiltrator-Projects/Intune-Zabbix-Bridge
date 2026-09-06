@@ -1,6 +1,7 @@
 # Intune-Zabbix-Bridge
 
-**Release:** 0.7.12  
+**Release:** 0.7.14
+
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** public source; public APT package
 
@@ -33,13 +34,15 @@ sudo install -o root -g root -m 0600 intune-zabbix-bridge.env \
 
 The package imports it into `/etc/intune-zabbix-bridge/bridge.env`, removes the inbox copy, enables the timer and performs the first collection. Per-user Downloads folders are not trusted.
 
-## Telemetry-only 0.7.12 mode
+## Telemetry-only mode
 
 Windows Update Ring collection is temporarily disabled in the shipped runtime. The collector makes **no update-ring Graph request**, so a missing `DeviceManagementConfiguration.Read.All` permission cannot stop the 15-minute collection cycle.
 
 The operational dashboard population is the proven set of devices that have actual Intune remediation reboot telemetry. Devices remain keyed internally by immutable `managedDevice.id`, while the widget shows weekly reboot compliance, actual last restart and uptime, telemetry freshness/age and collector freshness.
 
-0.7.12 fixes the Zabbix summary transport failure exposed when the restored population reached 176 devices. Zabbix text history has a fixed storage limit; an oversized JSON value can be accepted by `zabbix_sender` and then stored truncated, which makes the widget report invalid JSON. The shipped runtime now removes dormant ring/identity fields and the redundant top-ten copy from the wire summary while preserving every displayed row and counter. It also refuses to publish if the compact summary still exceeds the safe text budget, so a truncated generation cannot replace the last valid one.
+0.7.14 fixes collection stopping when the fleet summary outgrows the 64,000-byte safe text budget (the live 0.7.13 failure reached approximately 76,550 bytes). Small summaries remain plain JSON. Larger summaries use a versioned zlib/base64 JSON envelope, and the bundled widget decodes it losslessly before parsing the complete fleet. The final envelope must still fit 64,000 bytes; decoded content is bounded at 4,000,000 bytes. Publication is checked before any companion metric is sent, and the summary remains the final generation marker. No rows, values or counters are discarded to fit the transport.
+
+Upgrade with the Debian package so the collector and widget are updated together. Existing plain JSON history remains readable, and `--dry-run --json` remains ordinary uncompressed JSON. The existing Zabbix host, template, item key and deployment credentials remain in use. PHP zlib support is required by the widget for compressed summaries; the Python collector uses its standard-library zlib module.
 
 Update-ring cards, columns, search terms and ring fault states remain removed from the shipped widget while telemetry-only mode is active. The dormant ring-report implementation remains packaged only for later deliberate re-enablement.
 

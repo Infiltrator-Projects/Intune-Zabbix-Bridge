@@ -4,7 +4,7 @@
   "type": "widget",
   "name": "INTUNE — Reboot Watch",
   "namespace": "IntuneRebootWatch",
-  "version": "0.7.13",
+  "version": "0.7.14",
   "author": "Infiltrator Projects",
   "description": "Telemetry-only Zabbix dashboard with full-fleet sorting and independent uptime/telemetry severity.",
   "actions": {

@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-from intune_zabbix_bridge import current, hardened
+from intune_zabbix_bridge import current, hardened, transport
 from intune_zabbix_bridge.collector import Config
 
 
@@ -110,14 +110,14 @@ class CurrentRuntimeTests(unittest.TestCase):
         self.assertNotIn("top", decoded)
         self.assertLessEqual(
             len(value.encode("utf-8")),
-            current._ZABBIX_TEXT_SAFE_BYTES,
+            transport.ZABBIX_TEXT_SAFE_BYTES,
         )
         self.assertEqual(
             set(decoded["devices"][0]),
             set(current._COMPACT_DEVICE_FIELDS),
         )
 
-    def test_oversized_summary_fails_closed_instead_of_being_truncated(self):
+    def test_oversized_summary_remains_complete_for_transport_compression(self):
         raw_summary = {
             "generated_at": "2026-09-04T14:49:55+10:00",
             "devices": [
@@ -140,8 +140,13 @@ class CurrentRuntimeTests(unittest.TestCase):
             hardened.SUMMARY_KEY: json.dumps(raw_summary, separators=(",", ":"))
         }
 
-        with self.assertRaisesRegex(RuntimeError, "too large for safe Zabbix text storage"):
-            current._compact_summary_metric(metrics)
+        compact = current._compact_summary_metric(metrics)[hardened.SUMMARY_KEY]
+        self.assertGreater(len(compact.encode("utf-8")), transport.ZABBIX_TEXT_SAFE_BYTES)
+        self.assertEqual(json.loads(compact)["devices"], raw_summary["devices"])
+        self.assertLessEqual(
+            len(transport.encode_summary(compact).encode("utf-8")),
+            transport.ZABBIX_TEXT_SAFE_BYTES,
+        )
 
     def test_publication_uses_only_original_template_companion_keys(self):
         metrics = {

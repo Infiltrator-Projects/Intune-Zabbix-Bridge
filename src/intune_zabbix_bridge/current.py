@@ -34,12 +34,6 @@ _BASELINE_ZABBIX_KEYS = frozenset({
     hardened.SUMMARY_KEY,
 })
 
-# Zabbix 7 text history values are capped at 65,536 bytes on the supported
-# database backends. Keep a little headroom so the database can never truncate
-# the summary into invalid JSON while it is being used as the generation commit
-# marker.
-_ZABBIX_TEXT_SAFE_BYTES = 64_000
-
 # The installed widget needs only these per-device fields in telemetry-only
 # mode. FleetSummary deliberately supplies defaults for the omitted dormant ring
 # fields and accepts ``fresh`` as the legacy source for telemetry_status.
@@ -123,14 +117,9 @@ def _compact_summary_metric(metrics: dict[str, str]) -> dict[str, str]:
     summary.pop("top", None)
 
     compact = json.dumps(summary, separators=(",", ":"), ensure_ascii=False)
-    size = len(compact.encode("utf-8"))
-    if size > _ZABBIX_TEXT_SAFE_BYTES:
-        raise RuntimeError(
-            "fleet summary is too large for safe Zabbix text storage "
-            f"({size} bytes > {_ZABBIX_TEXT_SAFE_BYTES}); refusing to publish "
-            "a truncated generation"
-        )
-
+    # Publication encodes oversized summaries losslessly and checks the final
+    # wire budget before sending any metric. Keep ordinary JSON here so logging
+    # and --dry-run --json continue to expose the complete readable summary.
     updated = dict(metrics)
     updated[hardened.SUMMARY_KEY] = compact
     return updated

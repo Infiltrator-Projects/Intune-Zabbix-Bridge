@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.14 — 2026-09-07
+
+- Fixed the collector stopping every 15 minutes when the complete fleet summary reached approximately 76,550 bytes, above the 64,000-byte text budget.
+- Added lossless zlib/base64 transport for oversized summaries and matching bounded decoding in the bundled widget. Every device row, value and counter is retained; old plain JSON history remains readable.
+- Check the final encoded size before sending any companion metrics, and continue publishing the summary last. Keep readable JSON for diagnostics and dry runs.
+- Added 250- and 1,000-device publication regressions, Python-to-PHP round trips, malformed/oversized payload checks and round trips using the extracted Debian package.
+
 ## 0.7.13 — 2026-09-04
 
 - Fixed dashboard sorting so every sortable column ranks the complete fleet before the configured row limit is applied; stale/fault rows no longer distort the visible sorted result by being pinned into it after sorting.

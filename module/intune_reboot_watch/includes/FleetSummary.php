@@ -7,9 +7,19 @@ use JsonException;
 
 final class FleetSummary {
 
+    private const TRANSPORT = 'intune-zabbix-zlib-v1';
+    private const MAX_DECODED_BYTES = 4000000;
+    private const MAX_WIRE_BYTES = 64000;
+
     public function parse(string $json, int $row_limit = 10): array {
+        if (strlen($json) > self::MAX_DECODED_BYTES) {
+            throw new InvalidArgumentException('Fleet summary exceeds decoded size limit.');
+        }
         try {
             $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+            if (is_array($decoded) && array_key_exists('transport', $decoded)) {
+                $decoded = $this->decodeTransport($decoded, strlen($json));
+            }
         }
         catch (JsonException $exception) {
             throw new InvalidArgumentException('Fleet summary is not valid JSON.', 0, $exception);
@@ -77,6 +87,38 @@ final class FleetSummary {
             'devices' => $rows,
             'top' => array_slice($rows, 0, $row_limit)
         ];
+    }
+
+    /** Decode one bounded envelope; old plain JSON history remains readable. */
+    private function decodeTransport(array $envelope, int $wire_bytes): array {
+        if (($envelope['transport'] ?? null) !== self::TRANSPORT) {
+            throw new InvalidArgumentException('Unsupported fleet summary transport.');
+        }
+        $size = $envelope['uncompressed_bytes'] ?? null;
+        if ($wire_bytes > self::MAX_WIRE_BYTES
+                || !is_int($size) || $size < 1 || $size > self::MAX_DECODED_BYTES
+                || !is_string($envelope['data'] ?? null)) {
+            throw new InvalidArgumentException('Invalid compressed fleet summary envelope.');
+        }
+        if (!function_exists('gzuncompress')) {
+            throw new InvalidArgumentException('PHP zlib is required to read this fleet summary.');
+        }
+        $compressed = base64_decode($envelope['data'], true);
+        if ($compressed === false) {
+            throw new InvalidArgumentException('Fleet summary contains invalid base64 data.');
+        }
+        // Bound allocation before decoding and verify the declared byte length.
+        $json = @gzuncompress($compressed, $size);
+        if ($json === false || strlen($json) !== $size) {
+            throw new InvalidArgumentException('Fleet summary compression data is invalid.');
+        }
+        $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($decoded) || array_key_exists('transport', $decoded)
+                || !isset($decoded['devices']) || !is_array($decoded['devices'])
+                || !is_string($decoded['generated_at'] ?? null)) {
+            throw new InvalidArgumentException('Compressed fleet summary has invalid content.');
+        }
+        return $decoded;
     }
 
     /** @param list<array<string, mixed>> $rows */

@@ -39,3 +39,11 @@ If every device suddenly appears unassigned while Intune still has update rings,
 If **Telemetry missing/stale** is non-zero, the machine remains visible but its weekly restart state cannot be proven after policy activation.
 
 Graph permission or targeting-read failures should fail the collector rather than produce a misleading dashboard.
+
+## Compressed summary transport
+
+From 0.7.14, summaries larger than 64,000 bytes use the `intune-zabbix-zlib-v1` JSON envelope with `uncompressed_bytes` and base64 `data`. The widget checks the version, encoded size, declared size, zlib stream and decoded JSON before rendering. The encoded value stays within 64,000 bytes and the decoded limit is 4,000,000 bytes. Ordinary summaries and historical JSON still parse normally.
+
+The service logs the original and encoded byte counts on compressed publication. `--dry-run --json` remains readable JSON. If even the compressed envelope exceeds the budget, the service reports that explicitly and publishes no metrics for that attempt. The previous fleet summary remains visible with its actual collector age.
+
+Use the DEB to upgrade both collector and widget; the RUN installer updates the widget only. No Zabbix template or database change is needed. The PHP frontend must provide `gzuncompress` (zlib); Python uses the standard library.
