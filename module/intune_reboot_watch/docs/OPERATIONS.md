@@ -1,49 +1,46 @@
 # Operations guide
 
-## Normal operation
+Current behaviour: release 0.7.14, reboot telemetry only.
 
-The collector runs every 15 minutes. The widget uses normal Zabbix refresh scheduling and reads the newest fleet summary.
+For every card, column, colour, banner, control and editor field, use the [screen guide](SCREEN_GUIDE.md). Its definitions follow the shipped code, including the reporting-population and weekly-boundary limitations.
 
-The fleet row population is the current Intune managed-Windows estate. Update-ring targeting, reboot telemetry and weekly restart compliance are separate attributes.
+## Collection and display
 
-## Reboot state semantics
+The systemd service is `intune-zabbix-bridge.service`; its timer schedules a run approximately every 15 minutes. The widget's default refresh is 60 seconds, managed by Zabbix. Refreshing the widget reads stored history; it does not trigger Intune reporting or a collector run.
 
-**MISSED** means exactly one update ring targets the device, reboot telemetry is fresh, and the actual Windows last boot is earlier than the most recent applicable weekly restart boundary.
+The represented population consists of devices with usable reboot telemetry from the configured Intune remediation script. Records are joined and deduplicated by immutable `managedDevice.id`. Devices with no usable record are omitted; old usable records can remain as stale. `Windows` is therefore not the tenant's enrolled-device count, and `Telemetry missing = 0` does not prove complete tenant coverage.
 
-**Current** means exactly one update ring targets the device and the last boot is at or after that boundary. The Due / next column shows the next weekly boundary.
+The runtime makes no Windows Update Ring Graph requests. Ring counts in service logs describe dormant fields and do not gate the shipped reboot classification. The ring-disabled warning alone is not an error.
 
-**Unknown** means the weekly policy is active but Reboot Watch cannot safely decide because ring targeting is none/multiple or reboot telemetry is stale/missing.
+## Weekly reboot evaluation
 
-**Not active** means the first configured weekly boundary has not happened yet. For the current deployment this is Sunday 06/09/2026 at 03:00 Australia/Melbourne.
+The configured defaults are Sunday 03:00, `Australia/Melbourne`, with policy start `2026-09-06T03:00:00`.
 
-The dashboard must not substitute "uptime >= 7 days" for this test. Uptime remains useful context only.
+- Before the first applicable occurrence: Not active.
+- Once active, stale/missing telemetry or unavailable last restart: Unknown.
+- Fresh telemetry with last restart at or after the latest applicable occurrence: Current.
+- Fresh telemetry with last restart before that occurrence: MISSED.
 
-## Ring and telemetry semantics
+Freshness defaults to 48 hours (`MAX_TELEMETRY_AGE_HOURS`). The evaluator does not additionally require the report timestamp to be after the weekly occurrence. A recent-enough pre-boundary report can therefore produce MISSED until a newer boot report arrives. The widget does not execute or confirm a restart task.
 
-**Update ring** is effective membership returned by Intune's `getTargetedUsersAndDevices` targeting action for each discovered Windows Update Ring. The deprecated `deviceStatuses` feed is not used by the shipped collector. **Ring state** is One ring, No ring targeted, or Multiple rings.
+## Distinguishing old data
 
-The ring timestamp is the targeting record's latest Intune check-in time. **Telemetry** is Fresh, Stale or Missing for `Windows - Reboot Telemetry`. **Last restart** comes from Windows `LastBootUpTime`.
+Collector age uses the summary's `generated_at` against current time. It is independent of the companion `intune.windows.last.collection.epoch`, which records the newest device-report timestamp in the population. The footer's `Zabbix received` uses the selected summary history entry's clock.
 
-Search matches computer names, usernames and update-ring names. Default sorting puts MISSED first, then Unknown, then Not active, then Current.
+When generation or publication fails, the previous summary can remain visible and become Collector stale. Its device ages, uptime estimates and reboot classifications remain values from that old collection. A current collector can also publish stale individual device reports.
 
-## Fault isolation
+An invalid newest stored value produces an error panel. The widget does not scan back through history to find an older valid value.
 
-If **MISSED** is non-zero, those machines have fresh evidence that they have not rebooted since the required weekly boundary.
+## Summary publication and compression
 
-If **Unknown** is non-zero, inspect ring/telemetry columns before drawing a reboot conclusion.
+The service publishes the original nine companion metrics followed by `intune.windows.summary.json`, for ten items in total. The summary acts as the generation marker. A companion-send failure prevents the summary from advancing, although earlier companion items may already have been updated.
 
-If **No ring** or **Multiple rings** is non-zero, inspect Intune targeting. Reboot Watch does not silently choose a ring.
+From 0.7.14, summaries above 64,000 bytes use the `intune-zabbix-zlib-v1` JSON envelope with `uncompressed_bytes` and base64 `data`. The encoded value must fit 64,000 bytes; decoded content is bounded at 4,000,000 bytes. No represented device rows are dropped to fit. Encoding is checked before any companion item is sent.
 
-If every device suddenly appears unassigned while Intune still has update rings, the collector refuses to publish that generation. The last known-good summary remains in Zabbix instead of replacing it with a fabricated all-no-ring state.
+The widget checks the envelope version, size, base64/zlib data and decoded content. Python uses its standard-library zlib module; the PHP frontend needs `gzuncompress`. Old plain JSON history remains readable, and `--dry-run --json` remains uncompressed JSON.
 
-If **Telemetry missing/stale** is non-zero, the machine remains visible but its weekly restart state cannot be proven after policy activation.
+A compressed publication logs its raw and encoded byte counts. A successful service run ends with `Published 10 Zabbix items`. If even the compressed summary is too large, the error states that explicitly and no metrics are sent for that attempt.
 
-Graph permission or targeting-read failures should fail the collector rather than produce a misleading dashboard.
+## Deployment
 
-## Compressed summary transport
-
-From 0.7.14, summaries larger than 64,000 bytes use the `intune-zabbix-zlib-v1` JSON envelope with `uncompressed_bytes` and base64 `data`. The widget checks the version, encoded size, declared size, zlib stream and decoded JSON before rendering. The encoded value stays within 64,000 bytes and the decoded limit is 4,000,000 bytes. Ordinary summaries and historical JSON still parse normally.
-
-The service logs the original and encoded byte counts on compressed publication. `--dry-run --json` remains readable JSON. If even the compressed envelope exceeds the budget, the service reports that explicitly and publishes no metrics for that attempt. The previous fleet summary remains visible with its actual collector age.
-
-Use the DEB to upgrade both collector and widget; the RUN installer updates the widget only. No Zabbix template or database change is needed. The PHP frontend must provide `gzuncompress` (zlib); Python uses the standard library.
+Use the Debian package to upgrade both the collector and widget. The RUN installer updates the widget only. Existing host/template configuration and the protected deployment environment remain in use. See [installation](INSTALLATION.md) for the actual setup path.

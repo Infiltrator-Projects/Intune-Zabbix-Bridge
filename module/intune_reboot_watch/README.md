@@ -2,6 +2,8 @@
 
 **Release:** 0.7.14
 
+**Dashboard documentation:** [Screen guide - every card, column, colour and control](docs/SCREEN_GUIDE.md).
+
 
 0.7.14 restores collection for summaries above 64,000 bytes using a versioned zlib/base64 envelope. The widget decodes every device row and counter, accepts old plain JSON history, and bounds decoding to 4,000,000 bytes. Upgrade the Debian package to update the collector and widget together; PHP zlib is required for compressed summaries.
 **Platform:** Zabbix 7.0 LTS

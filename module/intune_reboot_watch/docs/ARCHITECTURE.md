@@ -1,68 +1,42 @@
 # Architecture
 
-## Purpose
+This document describes the shipped 0.7.14 runtime. The packaged update-ring/inventory implementation is dormant and must not be mistaken for the active collection path.
 
-INTUNE — Reboot Watch answers two separate questions for the managed Windows estate:
+## Active data flow
 
-1. is this machine effectively targeted by exactly one Windows Update Ring?
-2. has the machine rebooted since the applicable required weekly restart?
+1. `/usr/bin/intune-zabbix-bridge` calls `intune_zabbix_bridge.current.main`.
+2. The collector obtains a Graph token and reads the configured device health script's run states, including expanded managed-device information.
+3. `hardened.parse_run_states` extracts valid boot/report timestamps and keeps the newest usable record per immutable `managedDevice.id`. Report age and uptime are calculated at collection time.
+4. `current.collect_telemetry_only` builds the represented population from those telemetry records. No full Windows inventory or update-ring request is made.
+5. `current.evaluate_reboot_telemetry_only` reuses the weekly schedule evaluator with a synthetic one-ring count. This removes ring membership as a prerequisite while keeping the recorded-boot and freshness rules.
+6. Metrics are built and redundant/dormant summary fields are removed. Internal metrics and dry-run JSON stay readable.
+7. `hardened.send_metrics` preflights the summary through `transport.encode_summary`, sends the baseline companion items, then sends the summary last.
+8. `WidgetView` reads the most recent accessible Zabbix summary history value. `FleetSummary` decodes and normalises it, derives full-population counters, and supplies the complete device list.
+9. The PHP view formats the cards/table/footer. JavaScript searches and sorts all supplied rows before applying the visible-row limit.
 
-Neither policy targeting nor reboot telemetry is allowed to make a computer disappear.
+## Population and identity
 
-## Data flow
+The population is usable remediation telemetry, not the tenant's entire enrolled Windows estate. Invalid records and devices without usable reports are omitted. Stale but valid reports remain eligible for rows. Duplicate computer names remain separate when their immutable Intune IDs differ. The compact wire summary omits IDs which the widget does not display; it does not collapse those rows.
 
-```text
-Intune managed Windows inventory
-        │
-        ├──────────── estate ────────────────────────────────┐
-        │                                                    │
-Windows Update Ring targeting                         Windows client
-getTargetedUsersAndDevices                            LastBootUpTime
-        │                                                    │
-        └──────────── Microsoft Graph ───────────────────────┘
-                              │
-                              ▼
-                    Intune-Zabbix-Bridge
-                              │
-              weekly restart schedule evaluator
-                              │
-                              ▼
-       MISSED / Current / Unknown / Not active
-                              │
-                         zabbix_sender
-                              ▼
-                    INTUNE — Reboot Watch
-```
+## Interpretation boundaries
 
-## Ring state
+The [screen guide](SCREEN_GUIDE.md) defines the nine cards, ten columns, status rules and controls. In particular:
 
-Windows Update Ring membership is an assignment/targeting question. The collector asks Intune for the effective targeted users/devices of each discovered Windows Update Ring instead of relying on the deprecated `deviceConfigurationDeviceStatus`/`deviceStatuses` resource.
+- collector freshness and individual telemetry freshness are separate;
+- Longest uptime uses fresh telemetry only;
+- reboot classification is based on the latest recorded boot, not a live query;
+- the weekly evaluator does not require a fresh report to postdate the due occurrence;
+- summary-derived device ages, uptime and reboot classifications remain fixed until the next successful collection;
+- search and sort do not alter the complete-summary counters.
 
-Targets are correlated to the current managed-Windows inventory first by immutable `managedDevice.id`, then by Azure AD device ID. A name/UPN fallback is accepted only when it resolves to exactly one current device.
+## Publication and failure handling
 
-Every current managed Windows device remains visible and is classified as:
+Large summaries use a bounded, versioned zlib/base64 envelope within the existing text item. Plain history stays compatible. The encoded budget is 64,000 bytes and decoded budget is 4,000,000 bytes.
 
-- **one** — exactly one update ring targets it;
-- **none** — no discovered update ring targets it;
-- **multiple** — more than one update ring targets it.
+Graph errors, zero usable telemetry, encoding errors and failed companion sends prevent a new summary from being published. Earlier companion metrics may already have advanced if a later companion send fails. The widget reads the summary as a single generation.
 
-Ring name and the targeting record's latest check-in time are retained. If rings exist but no targeting records can be resolved at all, collection fails rather than publishing an all-unassigned fleet.
+The widget shows an older readable summary with its age if no new summary arrives. It shows an error panel if the newest stored value itself is invalid; it does not fall back to older history.
 
-## Weekly reboot state
+## Read-only UI
 
-The current deployment mirrors the endpoint catch-up helper: Sunday at 03:00 in `Australia/Melbourne`, first active occurrence 06/09/2026 03:00. These values are overrideable through the deployment environment file.
-
-For each device:
-
-- before the first active weekly boundary: **Not active**;
-- after activation, if ring count is not exactly one or reboot telemetry is stale/missing: **Unknown**;
-- with one ring and fresh telemetry, if `LastBootUpTime >= applicable weekly boundary`: **Current**;
-- with one ring and fresh telemetry, if `LastBootUpTime < applicable weekly boundary`: **MISSED**.
-
-This duplicates the observation rule of the client catch-up helper without issuing any restart itself.
-
-## Failure model
-
-Graph/read failures fail the collector rather than manufacturing a result. Missing or contradictory per-device signals remain explicit row states. The Zabbix widget derives fleet counters from the same normalized device rows it displays so aggregate cards cannot contradict the table.
-
-Browser JavaScript only filters/sorts supplied Zabbix data and performs no network access.
+The widget never creates Zabbix groups, hosts or items, and never restarts devices. Source discovery is read-only. The package supplies the template for explicit setup. The browser's search/sort code operates on supplied rows; Zabbix owns widget refresh requests. Graph credentials remain in the collector environment.

@@ -2,6 +2,8 @@
 
 **Release:** 0.7.14
 
+**Dashboard documentation:** [Screen guide - every card, column, colour and control](module/intune_reboot_watch/docs/SCREEN_GUIDE.md).
+
 **Platform:** Microsoft Intune + Zabbix 7.0 LTS  
 **Distribution:** public source; public APT package
 
