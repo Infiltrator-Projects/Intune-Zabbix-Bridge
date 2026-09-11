@@ -1,0 +1,52 @@
+name: One-shot verified branch cleanup
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.event.head_commit.message == 'Repository branch cleanup: remove verified obsolete refs'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify branch tips against integrated main trees and delete them
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+
+          verify_and_delete() {
+            branch="$1"
+            expected_head="$2"
+            integrated_commit="$3"
+
+            current_head="$(gh api "repos/$GH_REPO/git/ref/heads/$branch" --jq '.object.sha')"
+            if [[ "$current_head" != "$expected_head" ]]; then
+              echo "::error::Refusing to delete $branch: expected $expected_head but found $current_head"
+              exit 1
+            fi
+
+            branch_tree="$(gh api "repos/$GH_REPO/git/commits/$current_head" --jq '.tree.sha')"
+            integrated_tree="$(gh api "repos/$GH_REPO/git/commits/$integrated_commit" --jq '.tree.sha')"
+            if [[ "$branch_tree" != "$integrated_tree" ]]; then
+              echo "::error::Refusing to delete $branch: branch tree $branch_tree differs from integrated main tree $integrated_tree"
+              exit 1
+            fi
+
+            gh api --method DELETE "repos/$GH_REPO/git/refs/heads/$branch"
+            echo "Deleted verified obsolete branch: $branch"
+          }
+
+          verify_and_delete 'fix/reboot-watch-inventory-left-join' '9b15e54a0d7b1790c0f8a39ed6a53cb844170e31' '31a65cde2947cdc3d994137c5de62fa13f3e1b7e'
+          verify_and_delete 'fix/reboot-watch-ring-status-source' '3d959d4db921ef81c9387647d92ff39eb6da0a6a' '404eb43c3cb18dc76b648ad35454c560b26e7a93'
+          verify_and_delete 'fix/reboot-watch-weekly-due-state' 'd57449c88ca4ca3cf6025253733bd8a3f821589d' '890a54035bb5cb3a3ce831e877e9c0b8045c4e97'
+          verify_and_delete 'DUMMY-DO-NOT-CREATE' 'f3670da0672f238904698eede36a4fff897071a6' 'f3670da0672f238904698eede36a4fff897071a6'
+          verify_and_delete 'cleanup-workflow-do-not-use' 'f3670da0672f238904698eede36a4fff897071a6' 'f3670da0672f238904698eede36a4fff897071a6'
+          verify_and_delete 'HAL-ERROR-REMOVE' 'f3670da0672f238904698eede36a4fff897071a6' 'f3670da0672f238904698eede36a4fff897071a6'
+          verify_and_delete 'HAL-ERROR-REMOVE-2' 'f3670da0672f238904698eede36a4fff897071a6' 'f3670da0672f238904698eede36a4fff897071a6'
+          verify_and_delete 'HAL-ERROR-REMOVE-3' 'f3670da0672f238904698eede36a4fff897071a6' 'f3670da0672f238904698eede36a4fff897071a6'
