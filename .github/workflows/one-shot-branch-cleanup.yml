@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   cleanup:
-    if: github.event.head_commit.message == 'Repository branch cleanup: remove verified obsolete refs'
+    if: "github.event.head_commit.message == 'Repository branch cleanup: remove verified obsolete refs'"
     runs-on: ubuntu-latest
     steps:
       - name: Verify branch tips against integrated main trees and delete them
