@@ -202,4 +202,31 @@ if ($contradictory['one_ring_devices'] !== 2
     fail_fleet('Dashboard counters can still contradict the device rows.');
 }
 
+$uptime_summary = $parser->parse(json_encode([
+    'devices' => [
+        [
+            'computer_name' => 'PC-FRESH',
+            'telemetry_status' => 'fresh',
+            'uptime_days' => 13.1
+        ],
+        [
+            'computer_name' => 'PC-STALE',
+            'telemetry_status' => 'stale',
+            'uptime_days' => 139.6
+        ],
+        [
+            'computer_name' => 'PC-MISSING',
+            'telemetry_status' => 'missing',
+            'uptime_days' => null
+        ]
+    ]
+], JSON_THROW_ON_ERROR));
+
+if (abs($uptime_summary['max_uptime_days'] - 139.6) > 0.0001
+        || $uptime_summary['over_7_days'] !== 2
+        || $uptime_summary['over_14_days'] !== 1
+        || $uptime_summary['over_30_days'] !== 1) {
+    fail_fleet('Uptime aggregates still exclude stale telemetry rows.');
+}
+
 fwrite(STDOUT, "FleetSummary tests passed.\n");
