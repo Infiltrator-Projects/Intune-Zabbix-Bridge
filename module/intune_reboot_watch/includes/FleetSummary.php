@@ -169,7 +169,10 @@ final class FleetSummary {
                 default => $counts['reboot_unknown_devices']++
             };
 
-            if ($row['telemetry_status'] === 'fresh' && $row['uptime_days'] !== null) {
+            // Uptime is historical boot evidence and remains meaningful even when
+            // the latest telemetry report is stale. Freshness gates reboot-policy
+            // compliance, not uptime statistics.
+            if ($row['uptime_days'] !== null) {
                 $uptime = (float) $row['uptime_days'];
                 $counts['max_uptime_days'] = max($counts['max_uptime_days'], $uptime);
                 if ($uptime >= 7) {
