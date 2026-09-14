@@ -65,6 +65,48 @@ class CurrentRuntimeTests(unittest.TestCase):
         self.assertNotIn("managed_device_id", summary["devices"][0])
         self.assertNotIn("ring_state", summary["devices"][0])
 
+    def test_uptime_metrics_include_stale_rows(self):
+        records = [
+            hardened.FleetDevice(
+                "fresh-device", "PC-FRESH", "", (), 0, "none", "not-targeted",
+                None, None, None, 13.1, 1.0, "fresh"
+            ),
+            hardened.FleetDevice(
+                "stale-device", "PC-STALE", "", (), 0, "none", "not-targeted",
+                None, None, None, 139.6, 240.0, "stale"
+            ),
+        ]
+        metrics = {
+            "intune.windows.reporting.count": "2",
+            "intune.windows.fresh.count": "1",
+            "intune.windows.stale.count": "1",
+            "intune.windows.max.uptime.days": "13.100",
+            "intune.windows.uptime.over7.count": "1",
+            "intune.windows.uptime.over14.count": "0",
+            "intune.windows.uptime.over30.count": "0",
+            "intune.windows.last.collection.epoch": "0",
+            "intune.windows.top10": "table",
+            hardened.SUMMARY_KEY: json.dumps({
+                "max_uptime_days": 13.1,
+                "over_7_days": 1,
+                "over_14_days": 0,
+                "over_30_days": 0,
+                "devices": [],
+            }),
+        }
+
+        updated = current._apply_full_fleet_uptime_metrics(records, metrics)
+        summary = json.loads(updated[hardened.SUMMARY_KEY])
+
+        self.assertEqual(updated["intune.windows.max.uptime.days"], "139.600")
+        self.assertEqual(updated["intune.windows.uptime.over7.count"], "2")
+        self.assertEqual(updated["intune.windows.uptime.over14.count"], "1")
+        self.assertEqual(updated["intune.windows.uptime.over30.count"], "1")
+        self.assertEqual(summary["max_uptime_days"], 139.6)
+        self.assertEqual(summary["over_7_days"], 2)
+        self.assertEqual(summary["over_14_days"], 1)
+        self.assertEqual(summary["over_30_days"], 1)
+
     def test_operational_summary_fits_current_176_device_fleet(self):
         devices = []
         for index in range(176):
