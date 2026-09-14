@@ -146,6 +146,54 @@ def baseline_zabbix_metrics(metrics: dict[str, str]) -> dict[str, str]:
     }
 
 
+def _apply_full_fleet_uptime_metrics(
+    records: list[hardened.FleetDevice],
+    metrics: dict[str, str],
+) -> dict[str, str]:
+    """Keep uptime aggregates independent from telemetry freshness.
+
+    A stale report cannot prove weekly reboot compliance, but its recorded boot
+    time is still valid historical uptime evidence. The dashboard therefore
+    includes every row with a usable uptime value in longest/threshold metrics.
+    """
+    uptimes = [
+        float(record.uptime_days)
+        for record in records
+        if record.uptime_days is not None
+    ]
+    max_uptime = max(uptimes, default=0.0)
+    over_7 = sum(uptime >= 7 for uptime in uptimes)
+    over_14 = sum(uptime >= 14 for uptime in uptimes)
+    over_30 = sum(uptime >= 30 for uptime in uptimes)
+
+    raw = metrics.get(hardened.SUMMARY_KEY)
+    if raw is None:
+        raise RuntimeError("summary metric is missing from generated metrics")
+    try:
+        summary = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("generated summary is not valid JSON") from exc
+    if not isinstance(summary, dict):
+        raise RuntimeError("generated summary is not a JSON object")
+
+    summary["max_uptime_days"] = round(max_uptime, 3)
+    summary["over_7_days"] = over_7
+    summary["over_14_days"] = over_14
+    summary["over_30_days"] = over_30
+
+    updated = dict(metrics)
+    updated["intune.windows.max.uptime.days"] = f"{max_uptime:.3f}"
+    updated["intune.windows.uptime.over7.count"] = str(over_7)
+    updated["intune.windows.uptime.over14.count"] = str(over_14)
+    updated["intune.windows.uptime.over30.count"] = str(over_30)
+    updated[hardened.SUMMARY_KEY] = json.dumps(
+        summary,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return updated
+
+
 def collect_telemetry_only(
     config: legacy.Config,
 ) -> tuple[list[hardened.FleetDevice], dict[str, str]]:
@@ -187,6 +235,7 @@ def collect_telemetry_only(
         telemetry_records,
     )
     metrics = hardened.build_metrics(records, config=config, now=now)
+    metrics = _apply_full_fleet_uptime_metrics(records, metrics)
     metrics = _compact_summary_metric(metrics)
     return records, baseline_zabbix_metrics(metrics)
 
