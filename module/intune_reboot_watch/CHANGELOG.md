@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.15 — 2026-09-14
+
+- Fixed **Longest uptime** so stale telemetry rows with a usable recorded boot time are included in the fleet uptime maximum and threshold counters.
+- Kept weekly reboot compliance freshness-gated: stale telemetry remains Unknown for policy compliance even though its historical uptime remains visible and sortable.
+- Aligned the shipped collector's companion uptime metrics with the widget's full-fleet uptime calculation.
+- Added regressions covering a fresh 13.1-day row and a stale 139.6-day row.
+
 ## 0.7.14 — 2026-09-07
 
 - Fixed the collector stopping every 15 minutes when the complete fleet summary reached approximately 76,550 bytes, above the 64,000-byte text budget.
