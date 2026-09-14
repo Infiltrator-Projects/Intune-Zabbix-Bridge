@@ -1,6 +1,6 @@
 # INTUNE - Reboot Watch: screen guide
 
-For dashboard users and support staff. Checked against release **0.7.14**, source commit `6ef81d779365ba855c91c02bc452e184e782394e`, on 7 September 2026.
+For dashboard users and support staff. Updated for release **0.7.15** on 14 September 2026.
 
 ## 1. Reading the overview
 
@@ -20,7 +20,7 @@ Read the screen from top to bottom: collector health, fleet totals, search and r
 | Telemetry fresh | Devices whose report age is within the collector's freshness threshold, normally 48 hours. Green. |
 | Telemetry stale | Devices with usable but older reports. Amber when greater than zero. |
 | Telemetry missing | Rows classified as having no telemetry. Red when greater than zero. The shipped telemetry-only collector normally produces zero here because devices without usable reports are omitted from its population. |
-| Longest uptime | Highest uptime among devices with fresh telemetry, shown in days to one decimal place. Cyan is an accent, not a reboot-status judgement. If there are no eligible values, it shows 0.0 d. |
+| Longest uptime | Highest usable uptime across the complete represented fleet, including stale telemetry rows, shown in days to one decimal place. Cyan is an accent, not a reboot-status judgement. If there are no usable uptime values, it shows 0.0 d. |
 
 The cards describe the complete summary. Searching, sorting or changing the number of displayed rows does not change their totals. A stale summary leaves its previous counts and row values visible; the collector banner identifies that age.
 
@@ -54,7 +54,7 @@ The cards describe the complete summary. Searching, sorting or changing the numb
 | Reboot badges | MISSED is red; Current green; Unknown amber; Not active muted blue-grey. MISSED also gives the row a light red background. |
 | Telemetry badges | Fresh is green; Stale amber; Missing red. Missing telemetry also gives the row a light red background. |
 
-Displayed rounding can make a value near a colour threshold appear to sit on it. Uptime colour and reboot status are independent. A short uptime can still predate the latest weekly restart time. A red uptime can appear alongside stale telemetry. The Longest uptime card can be lower than a stale row's uptime because the card excludes stale rows.
+Displayed rounding can make a value near a colour threshold appear to sit on it. Uptime colour and reboot status are independent. A short uptime can still predate the latest weekly restart time. A red uptime can appear alongside stale telemetry. The Longest uptime card uses every row with a usable uptime value; telemetry freshness does not suppress a stale row from that uptime statistic.
 
 Blank users, absent timestamps and unavailable numeric values display a dash. Row dates use day/month/year and a 12-hour clock with seconds in the PHP frontend's effective timezone. Weekly schedule evaluation uses the collector's configured timezone; these timezone settings can differ.
 
@@ -64,7 +64,7 @@ Blank users, absent timestamps and unavailable numeric values display a dash. Ro
 
 The collector finds the most recent scheduled weekly restart occurrence at or before the collection time, subject to the policy start. It compares the device's recorded boot against that occurrence. A restart at the exact scheduled timestamp counts as Current.
 
-| Reboot state | Rule used by release 0.7.14 | Due / next |
+| Reboot state | Rule used by release 0.7.15 | Due / next |
 | --- | --- | --- |
 | Not active | The first scheduled occurrence on or after policy start has not arrived. This check happens before telemetry freshness is considered. | First applicable occurrence. |
 | Unknown | The policy is active and telemetry is stale/missing, or the last restart is unavailable. Update-ring membership is not a condition in the shipped telemetry-only runtime. | Latest applicable occurrence. |
@@ -183,11 +183,11 @@ Update-ring collection, cards, columns and search are disabled. The ring-disable
 | The Intune fleet summary is invalid: ... | The newest stored value could not be decoded or parsed. The following detail identifies the JSON, compression, size or PHP-zlib issue. The error panel replaces the normal content. |
 | No managed Windows devices are available. | The parsed summary contains no usable rows. This is the widget's generic empty-data label; the normal collector refuses to publish an empty usable population. |
 
-Collector stale accompanies an older readable summary. Invalid data replaces the display with an error panel. Release 0.7.14 uses lossless compression within a 64,000-byte transport budget and 4,000,000-byte decoded bound. Failed collection/publication can leave the previous summary ageing in place.
+Collector stale accompanies an older readable summary. Invalid data replaces the display with an error panel. Release 0.7.15 retains the lossless compressed summary transport introduced in 0.7.14, within a 64,000-byte transport budget and 4,000,000-byte decoded bound. Failed collection/publication can leave the previous summary ageing in place.
 
 ### Where these screen rules are implemented
 
-The [verified repository source](https://github.com/Infiltrator-Projects/Intune-Zabbix-Bridge/tree/6ef81d779365ba855c91c02bc452e184e782394e) contains the following files. Widget paths below are relative to `module/intune_reboot_watch/`.
+The repository source contains the following files. Widget paths below are relative to `module/intune_reboot_watch/`.
 
 | Source path | Responsibility |
 | --- | --- |
@@ -200,4 +200,4 @@ The [verified repository source](https://github.com/Infiltrator-Projects/Intune-
 | src/intune_zabbix_bridge/current.py, hardened.py and collector.py | Population, telemetry, uptime and reboot rules. |
 | src/intune_zabbix_bridge/transport.py | Compression and transport limits. |
 
-Scope: the Reboot Watch widget in release 0.7.14. This guide describes the implemented behaviour; it does not change configuration, collection or reboot policy.
+Scope: the Reboot Watch widget in release 0.7.15. This guide describes the implemented behaviour; it does not change configuration, collection or reboot policy.
