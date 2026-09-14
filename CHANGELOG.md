@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.15 — 2026-09-14
+
+- Fixed **Longest uptime** so it reflects the highest usable uptime across the complete dashboard population, including rows whose telemetry is stale.
+- Kept telemetry freshness separate from uptime: stale telemetry still cannot prove weekly reboot compliance, but it no longer suppresses historical uptime from the headline or uptime threshold counters.
+- Aligned the shipped collector companion uptime metrics with the widget's full-fleet uptime semantics.
+- Added PHP and Python regressions covering a fresh 13.1-day row alongside a stale 139.6-day row.
+
 ## 0.7.14 — 2026-09-07
 
 - Fixed the collector stopping every 15 minutes when the complete fleet summary reached approximately 76,550 bytes, above the 64,000-byte text budget.
@@ -25,7 +32,7 @@
 
 - Restored the proven remediation-telemetry population used by the working collector instead of expanding Reboot Watch to every managed Windows inventory record.
 - Kept immutable `managedDevice.id` identity for reporting devices while leaving Windows Update Ring Graph collection disabled.
-- Publish only the original long-standing Zabbix companion trapper keys plus the summary JSON; optional ring/reboot companion keys can no longer make an older deployed template reject the generation before the summary commit marker is sent.
+- Publish only the original long-standing Zabbix companion trapper keys plus the summary JSON; optional ring/reboot companion keys can no longer make an older deployed template reject the generation before the summary commit marker can be sent.
 - Reboot and telemetry counters used by the widget remain authoritative inside the summary JSON.
 - Added regressions for the restored operational population, backward-compatible publication key set and zero-telemetry fail-closed behaviour.
 
